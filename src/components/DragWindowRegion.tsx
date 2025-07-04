@@ -4,7 +4,7 @@ import {
 	minimizeWindow,
 } from "@/helpers/window_helpers";
 import usePlatform from "@/hooks/usePlatform";
-import React, { type ReactNode } from "react";
+import React from "react";
 
 export function DragWindowRegion() {
 	const { isWindows } = usePlatform();

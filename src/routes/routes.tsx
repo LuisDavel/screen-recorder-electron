@@ -1,7 +1,8 @@
 import { createRoute } from "@tanstack/react-router";
 import { RootRoute } from "./__root";
 import HomePage from "@/pages/HomePage";
-import SecondPage from "@/pages/SecondPage";
+import ScreenRecorderPage from "@/pages/ScreenRecorderPage";
+import ConfigPage from "@/pages/ConfigPage";
 
 // TODO: Steps to add a new route:
 // 1. Create a new page component in the '../pages/' directory (e.g., NewPage.tsx)
@@ -23,15 +24,25 @@ import SecondPage from "@/pages/SecondPage";
 // 5. Add Link: <Link to="/new">New Page</Link>
 
 export const HomeRoute = createRoute({
-  getParentRoute: () => RootRoute,
-  path: "/",
-  component: HomePage,
+	getParentRoute: () => RootRoute,
+	path: "/",
+	component: HomePage,
 });
 
-export const SecondPageRoute = createRoute({
-  getParentRoute: () => RootRoute,
-  path: "/second-page",
-  component: SecondPage,
+export const ConfigPageRoute = createRoute({
+	getParentRoute: () => RootRoute,
+	path: "/config",
+	component: ConfigPage,
 });
 
-export const rootTree = RootRoute.addChildren([HomeRoute, SecondPageRoute]);
+export const ScreenRecorderRoute = createRoute({
+	getParentRoute: () => RootRoute,
+	path: "/screen-recorder",
+	component: ScreenRecorderPage,
+});
+
+export const rootTree = RootRoute.addChildren([
+	HomeRoute,
+	ConfigPageRoute,
+	ScreenRecorderRoute,
+]);

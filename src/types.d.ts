@@ -6,31 +6,86 @@ declare const MAIN_WINDOW_VITE_NAME: string;
 
 // Preload types
 interface ThemeModeContext {
-  toggle: () => Promise<boolean>;
-  dark: () => Promise<void>;
-  light: () => Promise<void>;
-  system: () => Promise<boolean>;
-  current: () => Promise<"dark" | "light" | "system">;
+	toggle: () => Promise<boolean>;
+	dark: () => Promise<void>;
+	light: () => Promise<void>;
+	system: () => Promise<boolean>;
+	current: () => Promise<"dark" | "light" | "system">;
 }
 interface ElectronWindow {
-  minimize: () => Promise<void>;
-  maximize: () => Promise<void>;
-  close: () => Promise<void>;
+	minimize: () => Promise<void>;
+	maximize: () => Promise<void>;
+	close: () => Promise<void>;
 }
 
 // Adicionar a interface PlatformContext
 interface PlatformContext {
-  get: () => Promise<PlatformType>;
-  isMacOS: () => Promise<boolean>;
-  isWindows: () => Promise<boolean>;
-  isLinux: () => Promise<boolean>;
+	get: () => Promise<PlatformType>;
+	isMacOS: () => Promise<boolean>;
+	isWindows: () => Promise<boolean>;
+	isLinux: () => Promise<boolean>;
+}
+
+// Adicionar a interface ScreenRecorderContext
+interface ScreenRecorderContext {
+	getSources: () => Promise<ScreenSource[]>;
+	startRecording: (
+		sourceId: string,
+	) => Promise<{ success: boolean; message: string }>;
+	stopRecording: () => Promise<{ success: boolean; message: string }>;
+	saveRecording: (
+		videoBuffer: Buffer,
+	) => Promise<{ success: boolean; message: string; filePath?: string }>;
+	getStatus: () => Promise<{ isRecording: boolean; recordedChunks: number }>;
+	getDefaultLocations: () => Promise<DefaultSaveLocations>;
+	chooseSaveLocation: () => Promise<{
+		success: boolean;
+		path?: string;
+		message: string;
+	}>;
+	saveToLocation: (
+		videoBuffer: Buffer,
+		saveLocation: string,
+	) => Promise<{
+		success: boolean;
+		message: string;
+		filePath?: string;
+		fileName?: string;
+	}>;
+	sendVideoChunk: (chunk: Buffer) => void;
+	onRecordingStarted: (callback: (event: any, data: any) => void) => void;
+	onRecordingStopped: (callback: (event: any) => void) => void;
+	removeAllListeners: () => void;
 }
 
 declare interface Window {
-  themeMode: ThemeModeContext;
-  electronWindow: ElectronWindow;
-  platform: PlatformContext; // Adicionar esta linha
+	themeMode: ThemeModeContext;
+	electronWindow: ElectronWindow;
+	platform: PlatformContext;
+	screenRecorder: ScreenRecorderContext;
 }
 
 // Adicionar o tipo PlatformType
-type PlatformType = "darwin" | "win32" | "linux" | "freebsd" | "openbsd" | "sunos" | "aix";
+type PlatformType =
+	| "darwin"
+	| "win32"
+	| "linux"
+	| "freebsd"
+	| "openbsd"
+	| "sunos"
+	| "aix";
+
+// Adicionar o tipo ScreenSource
+type ScreenSource = {
+	id: string;
+	name: string;
+	thumbnail: string;
+};
+
+// Adicionar o tipo DefaultSaveLocations
+type DefaultSaveLocations = {
+	desktop: string;
+	documents: string;
+	videos: string;
+	downloads: string;
+};
