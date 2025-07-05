@@ -1,0 +1,335 @@
+/* Background Recording Optimizations */
+
+/* Hide non-essential animations when recording in background */
+.recording-background-mode {
+  /* Disable expensive animations */
+  animation-play-state: paused !important;
+}
+
+.recording-background-mode *,
+.recording-background-mode *::before,
+.recording-background-mode *::after {
+  /* Reduce animation duration to minimum */
+  animation-duration: 0.01s !important;
+  animation-delay: 0s !important;
+  transition-duration: 0.01s !important;
+  transition-delay: 0s !important;
+}
+
+/* Keep essential recording indicators active */
+.recording-background-mode .recording-indicator,
+.recording-background-mode .recording-timer,
+.recording-background-mode .recording-status {
+  animation-play-state: running !important;
+  animation-duration: 1s !important;
+  transition-duration: 0.3s !important;
+}
+
+/* Optimize video elements for background rendering */
+.recording-background-mode video {
+  /* Reduce video quality slightly to save resources */
+  image-rendering: optimizeSpeed;
+  image-rendering: -webkit-optimize-contrast;
+}
+
+/* Hide decorative elements in background mode */
+.recording-background-mode .decorative-animation,
+.recording-background-mode .hover-effect,
+.recording-background-mode .particle-effect {
+  display: none !important;
+}
+
+/* Simplify shadows and effects */
+.recording-background-mode {
+  --shadow-sm: none;
+  --shadow: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --shadow-xl: none;
+}
+
+.recording-background-mode .shadow-sm,
+.recording-background-mode .shadow,
+.recording-background-mode .shadow-md,
+.recording-background-mode .shadow-lg,
+.recording-background-mode .shadow-xl {
+  box-shadow: none !important;
+}
+
+/* Optimize blur and backdrop effects */
+.recording-background-mode .backdrop-blur,
+.recording-background-mode .backdrop-blur-sm,
+.recording-background-mode .backdrop-blur-md,
+.recording-background-mode .backdrop-blur-lg {
+  backdrop-filter: none !important;
+}
+
+/* Background Recording Status Styles */
+.background-recording-status {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 9999;
+  pointer-events: auto;
+}
+
+.background-recording-status.minimized {
+  top: 8px;
+  right: 8px;
+}
+
+/* Recording Pulse Animation (essential - keep active) */
+@keyframes recording-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(0.95);
+  }
+}
+
+.recording-pulse {
+  animation: recording-pulse 1s ease-in-out infinite;
+}
+
+/* Disable pulse in background mode for non-essential elements */
+.recording-background-mode .recording-pulse:not(.essential) {
+  animation: none !important;
+}
+
+/* Essential recording indicators that should always animate */
+.recording-indicator.essential,
+.recording-dot.essential,
+.live-indicator.essential {
+  animation: recording-pulse 1s ease-in-out infinite !important;
+}
+
+/* Window State Classes */
+.window-minimized {
+  /* Styles when window is minimized */
+}
+
+.window-hidden {
+  /* Styles when window is hidden */
+}
+
+.window-background {
+  /* Styles when running in background */
+}
+
+/* Performance Optimizations */
+.recording-background-mode .non-essential {
+  /* Hide non-essential elements */
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.recording-background-mode .performance-heavy {
+  /* Disable performance-heavy features */
+  filter: none !important;
+  transform: none !important;
+  perspective: none !important;
+}
+
+/* Reduce repaints and reflows */
+.recording-background-mode .auto-optimized {
+  will-change: auto !important;
+  contain: layout style paint !important;
+}
+
+/* Memory optimization */
+.recording-background-mode .lazy-load {
+  /* Unload non-visible content */
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 1px;
+}
+
+/* Canvas optimizations */
+.recording-background-mode canvas {
+  /* Optimize canvas rendering */
+  image-rendering: optimizeSpeed;
+  image-rendering: pixelated;
+}
+
+/* Background Recording Notification Styles */
+.background-notification {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(239, 68, 68, 0.95);
+  color: white;
+  padding: 16px 24px;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  z-index: 10000;
+  animation: slideInScale 0.3s ease-out;
+}
+
+@keyframes slideInScale {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+/* Recording Performance Monitor */
+.performance-monitor {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
+  z-index: 9998;
+  opacity: 0.7;
+}
+
+.performance-monitor.warning {
+  background: rgba(245, 158, 11, 0.9);
+  color: black;
+}
+
+.performance-monitor.error {
+  background: rgba(239, 68, 68, 0.9);
+  color: white;
+}
+
+/* Hide performance monitor in background mode unless there's an issue */
+.recording-background-mode .performance-monitor:not(.warning):not(.error) {
+  display: none;
+}
+
+/* System Sleep Prevention Indicator */
+.sleep-prevention-indicator {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  background: rgba(34, 197, 94, 0.9);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  z-index: 9997;
+  opacity: 0.8;
+}
+
+/* Camera Overlay Optimizations */
+.recording-background-mode .camera-overlay {
+  /* Reduce camera overlay quality in background */
+  image-rendering: optimizeSpeed;
+}
+
+.recording-background-mode .camera-overlay video {
+  /* Lower quality for background rendering */
+  filter: none;
+}
+
+/* Reduce GPU usage in background */
+.recording-background-mode .gpu-accelerated {
+  transform: translateZ(0); /* Force minimal GPU usage */
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* Toast notifications optimizations */
+.recording-background-mode .toast {
+  /* Simplify toast animations in background */
+  transition: opacity 0.1s ease !important;
+}
+
+/* Utility classes for manual optimization */
+.hide-in-background {
+  /* Elements that should be hidden during background recording */
+}
+
+.recording-background-mode .hide-in-background {
+  display: none !important;
+}
+
+.essential-only {
+  /* Elements that should only show essential content during recording */
+}
+
+.recording-background-mode .essential-only > *:not(.essential) {
+  display: none !important;
+}
+
+/* Memory leak prevention */
+.recording-background-mode .prevent-leaks {
+  /* Clear any cached images/resources */
+  background-image: none !important;
+}
+
+.recording-background-mode .prevent-leaks img {
+  /* Reduce image quality */
+  image-rendering: optimizeSpeed;
+}
+
+/* Frame rate optimization classes */
+.fps-30 {
+  /* 30 FPS optimized rendering */
+  animation-timing-function: steps(30, end);
+}
+
+.fps-15 {
+  /* 15 FPS optimized rendering for background */
+  animation-timing-function: steps(15, end);
+}
+
+.recording-background-mode .fps-30 {
+  /* Reduce to 15 FPS in background */
+  animation-timing-function: steps(15, end) !important;
+}
+
+/* Responsive optimizations for background mode */
+@media (max-width: 768px) {
+  .recording-background-mode {
+    /* Additional mobile optimizations */
+    font-size: 14px;
+  }
+
+  .background-recording-status {
+    max-width: calc(100vw - 32px);
+  }
+}
+
+/* High contrast mode for better visibility when minimized */
+.recording-background-mode.high-contrast {
+  filter: contrast(1.2) brightness(1.1);
+}
+
+/* Accessibility improvements for background mode */
+.recording-background-mode *:focus {
+  outline: 2px solid #ef4444 !important;
+  outline-offset: 2px !important;
+}
+
+/* Screen reader optimizations */
+.recording-background-mode .sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* Final catch-all optimization */
+.recording-background-mode {
+  /* Overall performance boost */
+  contain: layout style paint;
+  content-visibility: auto;
+}
