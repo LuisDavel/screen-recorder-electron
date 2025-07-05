@@ -143,7 +143,7 @@ export function RecordingControls({
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col">
       <div className="flex items-center justify-between">
         <p className="text-muted-foreground text-sm">
           {isRecording && "Gravando..."}
@@ -161,7 +161,7 @@ export function RecordingControls({
 
       {/* Camera Overlay Option */}
       {!isRecording && (
-        <div className="bg-muted flex items-center justify-between rounded-lg p-3">
+        <div className="bg-muted/50 flex items-center justify-between rounded-xl p-4 backdrop-blur-sm">
           <div className="flex items-center space-x-3">
             {includeCameraOverlay && cameraEnabled ? (
               <Camera className="h-4 w-4 text-green-600" />
@@ -190,7 +190,7 @@ export function RecordingControls({
 
       {/* Header Option */}
       {!isRecording && (
-        <div className="bg-muted flex items-center justify-between rounded-lg p-3">
+        <div className="bg-muted/50 flex items-center justify-between rounded-xl p-4 backdrop-blur-sm">
           <div className="flex items-center space-x-3">
             <FileText
               className={`h-4 w-4 ${includeHeader && headerConfig.isEnabled ? "text-blue-600" : "text-gray-400"}`}
@@ -219,6 +219,7 @@ export function RecordingControls({
         <Button
           onClick={handleStartRecording}
           disabled={!selectedSourceId || !selectedSaveLocation || isLoading}
+          className="h-12 text-base"
         >
           {isLoading ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -232,6 +233,7 @@ export function RecordingControls({
           onClick={handleStopRecording}
           disabled={isLoading}
           variant="destructive"
+          className="h-12 text-base"
         >
           {isLoading ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -243,8 +245,8 @@ export function RecordingControls({
       )}
 
       {(!selectedSourceId || !selectedSaveLocation) && (
-        <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 dark:border-orange-800 dark:bg-orange-900/20">
-          <div className="space-y-1">
+        <div className="rounded-xl border border-orange-200 bg-orange-50 p-5 dark:border-orange-800 dark:bg-orange-900/20">
+          <div className="space-y-2">
             {!selectedSourceId && (
               <p className="text-sm text-orange-800 dark:text-orange-200">
                 ⚠️ Selecione uma fonte de captura antes de iniciar a gravação.

@@ -13,6 +13,7 @@ import { useCameraConfigStore } from "@/store/store-camera-config";
 import { useMicrophoneConfigStore } from "@/store/store-microphone-config";
 import { useCameraNotifications } from "@/hooks/useCameraNotifications";
 import { useMicrophoneNotifications } from "@/hooks/useMicrophoneNotifications";
+import { HeaderConfig } from "@/components/recording-header/HeaderConfig";
 
 export default function HomePage() {
   const { saveLocation } = useSaveLocationStore();
@@ -25,22 +26,22 @@ export default function HomePage() {
   useCameraNotifications();
   useMicrophoneNotifications();
   return (
-    <div className="flex h-full flex-col gap-4 p-4">
-      <div className="grid w-full grid-cols-2 items-start gap-4">
+    <div className="flex h-full flex-col gap-6 p-6">
+      <div className="grid w-full grid-cols-2 items-start gap-6">
         <ScreenPreview />
-        <Card className="h-full transition-all duration-200 hover:shadow-lg">
+        <Card className="h-full transition-all duration-200 hover:shadow-lg/20 hover:shadow-lg">
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
+            <CardTitle className="flex items-center space-x-3 text-xl">
               <Settings className="text-primary h-6 w-6" />
               <span>Configurações</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="max-h-[calc(100vh-200px)] space-y-2 overflow-auto">
               <CameraConfigDialog />
 
               {/* Camera Status Indicator */}
-              <div className="bg-muted flex items-center justify-between rounded-lg p-3">
+              <div className="bg-muted/50 flex items-center justify-between rounded-xl backdrop-blur-sm">
                 <div className="flex items-center space-x-3">
                   <div
                     className={`h-3 w-3 rounded-full ${
@@ -71,9 +72,10 @@ export default function HomePage() {
               </div>
 
               <MicrophoneConfigDialog />
+              <HeaderConfig />
 
               {/* Microphone Status Indicator */}
-              <div className="bg-muted flex items-center justify-between rounded-lg p-3">
+              <div className="bg-muted/50 flex items-center justify-between rounded-xl backdrop-blur-sm">
                 <div className="flex items-center space-x-3">
                   <div
                     className={`h-3 w-3 rounded-full ${
@@ -104,7 +106,7 @@ export default function HomePage() {
               </div>
 
               <Link to="/config">
-                <Button variant="outline" className="w-full">
+                <Button variant="outline" className="h-12 w-full text-base">
                   <Settings className="mr-2 h-4 w-4" />
                   Acessar Configurações
                 </Button>
@@ -113,12 +115,12 @@ export default function HomePage() {
           </CardContent>
         </Card>
       </div>
-      <div className="grid w-full max-w-6xl grid-cols-1 gap-6 md:grid-cols-2">
-        <Card className="transition-all duration-200 hover:shadow-lg">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
+      <div className="grid w-full max-w-6xl grid-cols-1 md:grid-cols-2">
+        <Card className="transition-all duration-200 hover:shadow-lg/20 hover:shadow-lg">
+          <CardHeader className="mb-0">
+            <CardTitle className="flex items-center space-x-3 text-xl">
               <Play className="text-primary h-6 w-6" />
-              <span>Contole de transmissão</span>
+              <span>Controle de transmissão</span>
             </CardTitle>
           </CardHeader>
           <CardContent>

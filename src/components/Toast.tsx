@@ -95,7 +95,7 @@ function ToastContainer() {
   const { toasts } = useToast();
 
   return (
-    <div className="bg-background fixed top-4 right-4 z-50 flex max-w-sm flex-col gap-2">
+    <div className="fixed top-4 right-4 z-50 flex max-w-sm flex-col gap-2">
       {toasts.map((toast) => (
         <ToastItem key={toast.id} toast={toast} />
       ))}

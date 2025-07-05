@@ -101,15 +101,15 @@ export function ScreenPreview() {
   }, [cameraEnabled, cameraDeviceId, initializeMainStream]);
 
   return (
-    <div className="h-full w-full space-y-4 rounded-lg border p-6">
+    <div className="h-full w-full space-y-6 rounded-xl border p-6 transition-all duration-200 hover:shadow-lg/20 hover:shadow-lg">
       {error && (
-        <div className="text-red-500">
-          Necessário permissão para capturar a tela
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
+          ⚠️ Necessário permissão para capturar a tela
         </div>
       )}
       <div
         ref={containerRef}
-        className="relative flex w-fit justify-center overflow-hidden rounded-md border bg-black"
+        className="relative flex w-fit justify-center overflow-hidden rounded-xl border-2 bg-black"
       >
         <video
           ref={videoRef}
@@ -120,12 +120,17 @@ export function ScreenPreview() {
         <CameraOverlay />
       </div>
       {loading && (
-        <div className="text-muted-foreground">Carregando preview...</div>
+        <div className="text-muted-foreground flex items-center gap-2">
+          <div className="border-primary h-4 w-4 animate-spin rounded-full border-2 border-t-transparent"></div>
+          Carregando preview...
+        </div>
       )}
-      <div className="flex w-full items-center justify-between gap-2">
-        <div className="flex flex-col items-start gap-1">
-          <label className="font-medium">Escolha a cena para gravar:</label>
-          <div className="flex items-center gap-2">
+      <div className="flex w-full items-center justify-between gap-4">
+        <div className="flex flex-col items-start gap-3">
+          <label className="text-sm font-medium">
+            Escolha a cena para gravar:
+          </label>
+          <div className="flex items-center gap-3">
             <Select
               value={selectedSourceId || ""}
               onValueChange={(value) => setSelectedSourceId(value)}
@@ -145,7 +150,10 @@ export function ScreenPreview() {
                 ))}
               </SelectContent>
             </Select>
-            <button className="p-2" onClick={() => window.location.reload()}>
+            <button
+              className="hover:bg-accent hover:text-accent-foreground rounded-lg border p-2.5 transition-all"
+              onClick={() => window.location.reload()}
+            >
               <RefreshCcw className="h-4 w-4" />
             </button>
           </div>

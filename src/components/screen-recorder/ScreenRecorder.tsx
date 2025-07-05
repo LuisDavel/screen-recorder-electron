@@ -48,9 +48,9 @@ export default function ScreenRecorder() {
   }, [previewStream]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center space-x-2">
+      <div className="flex items-center space-x-3">
         <Monitor className="text-primary h-8 w-8" />
         <div>
           <h1 className="text-3xl font-bold">Screen Recorder</h1>
@@ -60,12 +60,12 @@ export default function ScreenRecorder() {
         </div>
       </div>
 
-      <Card>
+      <Card className="transition-all duration-200 hover:shadow-lg/20 hover:shadow-lg">
         <CardHeader>
-          <CardTitle>Status</CardTitle>
+          <CardTitle className="text-lg">Status</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">Fonte selecionada:</span>
               <span className="text-muted-foreground text-sm">
@@ -100,12 +100,12 @@ export default function ScreenRecorder() {
 
       {/* Video Preview */}
       {(selectedSourceId || isRecording) && (
-        <Card>
+        <Card className="transition-all duration-200 hover:shadow-lg/20 hover:shadow-lg">
           <CardHeader>
-            <CardTitle>Preview</CardTitle>
+            <CardTitle className="text-lg">Preview</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="border-border aspect-video overflow-hidden rounded-lg border">
+            <div className="border-border aspect-video overflow-hidden rounded-xl border-2">
               <VideoPreviewWithHeader
                 stream={previewStream}
                 isRecording={isRecording}
@@ -115,9 +115,9 @@ export default function ScreenRecorder() {
         </Card>
       )}
 
-      <Card>
+      <Card className="transition-all duration-200 hover:shadow-lg/20 hover:shadow-lg">
         <CardHeader>
-          <CardTitle>Fonte de Captura</CardTitle>
+          <CardTitle className="text-lg">Fonte de Captura</CardTitle>
         </CardHeader>
         <CardContent>
           <SourceSelector
@@ -127,9 +127,9 @@ export default function ScreenRecorder() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="transition-all duration-200 hover:shadow-lg/20 hover:shadow-lg">
         <CardHeader>
-          <CardTitle>Controles</CardTitle>
+          <CardTitle className="text-lg">Controles</CardTitle>
         </CardHeader>
         <CardContent>
           <RecordingControls

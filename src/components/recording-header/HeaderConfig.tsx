@@ -1,14 +1,21 @@
-import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useHeaderConfigStore } from '@/store/store-header-config';
-import { FileText, User, Building, Hash } from 'lucide-react';
+import React from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useHeaderConfigStore } from "@/store/store-header-config";
+import { FileText, User, Building, Hash } from "lucide-react";
 
-export default function HeaderConfig() {
+export function HeaderConfig() {
   const { headerConfig, updateHeaderConfig } = useHeaderConfigStore();
+  const [isActive, setActive] = React.useState(false);
 
   const handleInputChange = (field: string, value: string | number) => {
     updateHeaderConfig({ [field]: value });
@@ -30,7 +37,7 @@ export default function HeaderConfig() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => updateHeaderConfig({ isEnabled: false })}
+              onClick={() => setActive(!isActive)}
             >
               Ocultar
             </Button>
@@ -44,150 +51,178 @@ export default function HeaderConfig() {
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <div>
-          <h3 className="text-lg font-semibold mb-4">Configuração do Header</h3>
-          <p className="text-sm text-muted-foreground mb-4">
-            Preencha as informações que aparecerão no header da gravação
-          </p>
+      {isActive && (
+        <CardContent className="space-y-6">
+          <div>
+            <h3 className="mb-4 text-lg font-semibold">
+              Configuração do Header
+            </h3>
+            <p className="text-muted-foreground mb-4 text-sm">
+              Preencha as informações que aparecerão no header da gravação
+            </p>
 
-          {/* Altura do Header */}
-          <div className="mb-6">
-            <Label htmlFor="height">Altura do Header (px)</Label>
-            <Input
-              id="height"
-              type="number"
-              placeholder="80"
-              value={headerConfig.height}
-              onChange={(e) => handleInputChange('height', parseInt(e.target.value) || 80)}
-              className="max-w-[200px]"
-            />
-          </div>
-
-          {/* Nome e Data do Exame */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div>
-              <Label htmlFor="examName" className="flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                Nome do Exame
-              </Label>
+            {/* Altura do Header */}
+            <div className="mb-6">
+              <Label htmlFor="height">Altura do Header (px)</Label>
               <Input
-                id="examName"
-                placeholder="Ex: Ultrassonografia Abdominal"
-                value={headerConfig.examName}
-                onChange={(e) => handleInputChange('examName', e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="examDate" className="flex items-center gap-2">
-                📅 Data do Exame
-              </Label>
-              <Input
-                id="examDate"
-                type="date"
-                value={headerConfig.examDate}
-                onChange={(e) => handleInputChange('examDate', e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* Dados do Paciente */}
-          <div className="space-y-4 mb-6">
-            <div>
-              <Label htmlFor="patientName" className="flex items-center gap-2">
-                <User className="h-4 w-4" />
-                Nome do Paciente
-              </Label>
-              <Input
-                id="patientName"
-                placeholder="Nome completo do paciente"
-                value={headerConfig.patientName}
-                onChange={(e) => handleInputChange('patientName', e.target.value)}
+                id="height"
+                type="number"
+                placeholder="80"
+                value={headerConfig.height}
+                onChange={(e) =>
+                  handleInputChange("height", parseInt(e.target.value) || 80)
+                }
+                className="max-w-[200px]"
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Nome e Data do Exame */}
+            <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <Label htmlFor="sex">Sexo</Label>
-                <Select
-                  value={headerConfig.patientSex}
-                  onValueChange={(value) => handleInputChange('patientSex', value)}
-                >
-                  <SelectTrigger id="sex">
-                    <SelectValue placeholder="Sexo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Masculino">Masculino</SelectItem>
-                    <SelectItem value="Feminino">Feminino</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="age">Idade</Label>
+                <Label htmlFor="examName" className="flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Nome do Exame
+                </Label>
                 <Input
-                  id="age"
-                  placeholder="Ex: 35 anos"
-                  value={headerConfig.patientAge}
-                  onChange={(e) => handleInputChange('patientAge', e.target.value)}
+                  id="examName"
+                  placeholder="Ex: Ultrassonografia Abdominal"
+                  value={headerConfig.examName}
+                  onChange={(e) =>
+                    handleInputChange("examName", e.target.value)
+                  }
+                />
+              </div>
+              <div>
+                <Label htmlFor="examDate" className="flex items-center gap-2">
+                  📅 Data do Exame
+                </Label>
+                <Input
+                  id="examDate"
+                  type="date"
+                  value={headerConfig.examDate}
+                  onChange={(e) =>
+                    handleInputChange("examDate", e.target.value)
+                  }
                 />
               </div>
             </div>
-          </div>
 
-          {/* Dados da Instituição */}
-          <div className="space-y-4 mb-6">
+            {/* Dados do Paciente */}
+            <div className="mb-6 space-y-4">
+              <div>
+                <Label
+                  htmlFor="patientName"
+                  className="flex items-center gap-2"
+                >
+                  <User className="h-4 w-4" />
+                  Nome do Paciente
+                </Label>
+                <Input
+                  id="patientName"
+                  placeholder="Nome completo do paciente"
+                  value={headerConfig.patientName}
+                  onChange={(e) =>
+                    handleInputChange("patientName", e.target.value)
+                  }
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <Label htmlFor="sex">Sexo</Label>
+                  <Select
+                    value={headerConfig.patientSex}
+                    onValueChange={(value) =>
+                      handleInputChange("patientSex", value)
+                    }
+                  >
+                    <SelectTrigger id="sex">
+                      <SelectValue placeholder="Sexo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Masculino">Masculino</SelectItem>
+                      <SelectItem value="Feminino">Feminino</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="age">Idade</Label>
+                  <Input
+                    id="age"
+                    placeholder="Ex: 35 anos"
+                    value={headerConfig.patientAge}
+                    onChange={(e) =>
+                      handleInputChange("patientAge", e.target.value)
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Dados da Instituição */}
+            <div className="mb-6 space-y-4">
+              <div>
+                <Label
+                  htmlFor="institution"
+                  className="flex items-center gap-2"
+                >
+                  <Building className="h-4 w-4" />
+                  Nome da Instituição
+                </Label>
+                <Input
+                  id="institution"
+                  placeholder="Nome do hospital, clínica ou laboratório"
+                  value={headerConfig.institutionName}
+                  onChange={(e) =>
+                    handleInputChange("institutionName", e.target.value)
+                  }
+                />
+              </div>
+            </div>
+
+            {/* Médico e CRM */}
+            <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <Label htmlFor="doctor">Médico Requisitante</Label>
+                <Input
+                  id="doctor"
+                  placeholder="Nome do médico"
+                  value={headerConfig.requestingDoctor}
+                  onChange={(e) =>
+                    handleInputChange("requestingDoctor", e.target.value)
+                  }
+                />
+              </div>
+              <div>
+                <Label htmlFor="crm">CRM</Label>
+                <Input
+                  id="crm"
+                  placeholder="Ex: 12345/SP"
+                  value={headerConfig.crm}
+                  onChange={(e) => handleInputChange("crm", e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* ID Externo */}
             <div>
-              <Label htmlFor="institution" className="flex items-center gap-2">
-                <Building className="h-4 w-4" />
-                Nome da Instituição
+              <Label htmlFor="externalId" className="flex items-center gap-2">
+                <Hash className="h-4 w-4" />
+                ID Externo
               </Label>
               <Input
-                id="institution"
-                placeholder="Nome do hospital, clínica ou laboratório"
-                value={headerConfig.institutionName}
-                onChange={(e) => handleInputChange('institutionName', e.target.value)}
+                id="externalId"
+                placeholder="Código ou ID do sistema externo"
+                value={headerConfig.externalId}
+                onChange={(e) =>
+                  handleInputChange("externalId", e.target.value)
+                }
               />
             </div>
           </div>
-
-          {/* Médico e CRM */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div>
-              <Label htmlFor="doctor">Médico Requisitante</Label>
-              <Input
-                id="doctor"
-                placeholder="Nome do médico"
-                value={headerConfig.requestingDoctor}
-                onChange={(e) => handleInputChange('requestingDoctor', e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="crm">CRM</Label>
-              <Input
-                id="crm"
-                placeholder="Ex: 12345/SP"
-                value={headerConfig.crm}
-                onChange={(e) => handleInputChange('crm', e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* ID Externo */}
-          <div>
-            <Label htmlFor="externalId" className="flex items-center gap-2">
-              <Hash className="h-4 w-4" />
-              ID Externo
-            </Label>
-            <Input
-              id="externalId"
-              placeholder="Código ou ID do sistema externo"
-              value={headerConfig.externalId}
-              onChange={(e) => handleInputChange('externalId', e.target.value)}
-            />
-          </div>
-        </div>
-      </CardContent>
+        </CardContent>
+      )}
     </Card>
   );
 }

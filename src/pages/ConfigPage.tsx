@@ -3,7 +3,6 @@ import { SaveLocationSelector } from "@/components/screen-recorder/SaveLocationS
 import { useSaveLocationStore } from "@/store/store-local-path-video";
 import { ArrowLeft } from "lucide-react";
 import { Link } from "@tanstack/react-router";
-import HeaderConfig from "@/components/recording-header/HeaderConfig";
 
 export default function SecondPage() {
   const { saveLocation, setSaveLocation } = useSaveLocationStore();
@@ -13,20 +12,19 @@ export default function SecondPage() {
   };
 
   return (
-    <div className="flex h-full flex-col gap-4 p-4">
-      <div className="flex flex-row items-center gap-2">
+    <div className="flex h-full flex-col gap-6 p-6">
+      <div className="flex flex-row items-center gap-3">
         <Link to="/" className="flex w-fit items-center justify-center">
-          <ArrowLeft className="h-6 w-6" />
+          <ArrowLeft className="h-6 w-6 transition-transform hover:scale-110" />
         </Link>
-        <h1 className="text-2xl font-bold">Configurações</h1>
+        <h1 className="text-3xl font-bold">Configurações</h1>
       </div>
-      <p className="text-muted-foreground text-sm">
+      <p className="text-muted-foreground text-base">
         Personalize suas preferências de gravação, qualidade e outros ajustes do
         aplicativo.
       </p>
-      <div className="flex flex-col gap-4">
-        <HeaderConfig />
-        <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="flex flex-col gap-6">
+        <div className="grid w-full grid-cols-1 gap-6 md:grid-cols-2">
           <SaveLocationSelector
             onLocationSelected={handleLocationSelected}
             selectedLocation={saveLocation}
