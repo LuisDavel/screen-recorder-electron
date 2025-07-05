@@ -58,7 +58,8 @@ export function HeaderConfig() {
               Configuração do Header
             </h3>
             <p className="text-muted-foreground mb-4 text-sm">
-              Preencha as informações que aparecerão no header da gravação
+              Preencha as informações que aparecerão no header superior da
+              gravação
             </p>
 
             {/* Altura do Header */}

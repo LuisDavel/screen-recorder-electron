@@ -38,8 +38,9 @@ export function ScreenPreview() {
         const availableSources = await window.screenRecorder.getSources();
         setSources(availableSources);
         if (availableSources.length > 0) {
-          setSelectedSourceId(availableSources[0].id);
-          setSourceId(availableSources[0]);
+          const firstSource = availableSources[0];
+          setSelectedSourceId(firstSource.id);
+          setSourceId(firstSource);
         }
       } catch (err: unknown) {
         setError(
@@ -133,7 +134,15 @@ export function ScreenPreview() {
           <div className="flex items-center gap-3">
             <Select
               value={selectedSourceId || ""}
-              onValueChange={(value) => setSelectedSourceId(value)}
+              onValueChange={(value) => {
+                setSelectedSourceId(value);
+                const selectedSource = sources.find(
+                  (source) => source.id === value,
+                );
+                if (selectedSource) {
+                  setSourceId(selectedSource);
+                }
+              }}
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Selecione uma fonte" />

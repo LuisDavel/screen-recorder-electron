@@ -96,8 +96,29 @@ export function RecordingControls({
       );
 
       options.includeCameraOverlay = includeCameraOverlay && cameraEnabled;
-      options.includeHeader = includeHeader && headerConfig.isEnabled;
+      options.includeHeader = true; // Forçado para teste
       options.headerConfig = headerConfig;
+
+      // Debug completo das opções
+      console.log("🎬 INICIANDO GRAVAÇÃO - Opções completas:", {
+        sourceId: options.sourceId,
+        includeHeader: options.includeHeader,
+        headerConfig: options.headerConfig,
+        headerEnabled: headerConfig.isEnabled,
+        headerHeight: headerConfig.height,
+        examName: headerConfig.examName,
+      });
+
+      // Validação do header
+      if (options.includeHeader && (!headerConfig || !headerConfig.isEnabled)) {
+        console.error("❌ ERRO: Header solicitado mas configuração inválida");
+        showError("Header inválido - verifique as configurações");
+        return;
+      }
+
+      if (options.includeHeader && headerConfig.isEnabled) {
+        console.log("✅ HEADER VALIDADO - Será aplicado à gravação");
+      }
 
       await recorder.startRecording(options);
       setIsRecording(true);
@@ -106,8 +127,9 @@ export function RecordingControls({
       if (includeCameraOverlay && cameraEnabled) {
         message += " com câmera";
       }
-      if (includeHeader && headerConfig.isEnabled) {
+      if (options.includeHeader && headerConfig.isEnabled) {
         message += " com header informativo";
+        console.log("🎯 HEADER APLICADO: Gravação incluirá header sobreposto");
       }
       showSuccess(message);
     } catch (error) {
@@ -201,7 +223,7 @@ export function RecordingControls({
               </Label>
               <span className="text-muted-foreground text-xs">
                 {headerConfig.isEnabled
-                  ? "Header será adicionado ao topo do vídeo"
+                  ? "Header será adicionado na parte superior do vídeo"
                   : "Configure o header nas configurações"}
               </span>
             </div>

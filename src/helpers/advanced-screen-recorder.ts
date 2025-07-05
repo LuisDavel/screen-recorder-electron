@@ -138,7 +138,11 @@ export class AdvancedScreenRecorderManager {
     audioStream: MediaStream | null,
     options: AdvancedRecordingOptions,
   ): Promise<MediaStream> {
-    console.log("Configurando compositor de vídeo");
+    console.log("Configurando compositor de vídeo", {
+      includeCamera: options.includeCameraOverlay,
+      includeHeader: options.includeHeader,
+      headerEnabled: options.headerConfig?.isEnabled,
+    });
 
     let currentStream = screenStream;
 
@@ -164,6 +168,12 @@ export class AdvancedScreenRecorderManager {
     }
 
     // Then, apply header if needed
+    console.log("Verificando se deve aplicar header:", {
+      includeHeader: options.includeHeader,
+      headerEnabled: options.headerConfig?.isEnabled,
+      headerConfig: options.headerConfig,
+    });
+
     if (options.includeHeader && options.headerConfig?.isEnabled) {
       try {
         console.log("Aplicando header ao vídeo");
@@ -176,16 +186,21 @@ export class AdvancedScreenRecorderManager {
         const width = settings.width || 1920;
         const height = settings.height || 1080;
 
+        console.log("Dimensões do vídeo para header:", { width, height });
+        console.log("Configurações do header:", options.headerConfig);
+
         currentStream = await this.headerComposer.composeWithHeader(
           currentStream,
           width,
           height,
         );
 
-        console.log("Header aplicado com sucesso");
+        console.log("Header aplicado com sucesso, novo stream:", currentStream);
       } catch (error) {
         console.error("Erro ao aplicar header:", error);
       }
+    } else {
+      console.log("Header não será aplicado - condições não atendidas");
     }
 
     // Finally, add audio if available
@@ -569,6 +584,8 @@ export class AdvancedScreenRecorderManager {
       sourceId,
       saveLocation,
       includeCameraOverlay: true,
+      includeHeader: false,
+      headerConfig: undefined,
       ...recommendedSettings,
       videoBitrate: 2500000, // 2.5 Mbps
     };

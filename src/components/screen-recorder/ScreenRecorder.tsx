@@ -1,38 +1,52 @@
 import React, { useState, useEffect } from "react";
-import SourceSelector from "./SourceSelector";
+
 import { RecordingControls } from "./RecordingControls";
 import VideoPreviewWithHeader from "./VideoPreviewWithHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Monitor } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Monitor, ArrowLeft } from "lucide-react";
 import { useSaveLocationStore } from "@/store/store-local-path-video";
+import { useSourceVideoStore } from "@/store/store-source-video";
+import { Link } from "@tanstack/react-router";
 
 export default function ScreenRecorder() {
-  const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
   const { saveLocation } = useSaveLocationStore();
+  const { sourceId } = useSourceVideoStore();
 
-  const handleSourceSelected = async (sourceId: string) => {
-    setSelectedSourceId(sourceId);
-
-    // Get preview stream
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          mandatory: {
-            chromeMediaSource: "desktop",
-            chromeMediaSourceId: sourceId,
-          },
-        } as MediaTrackConstraints & {
-          mandatory: { chromeMediaSource: string; chromeMediaSourceId: string };
-        },
-        audio: false,
-      });
-      setPreviewStream(stream);
-    } catch (error) {
-      console.error("Error getting preview stream:", error);
+  // Sync preview stream with selected source from store
+  useEffect(() => {
+    if (!sourceId?.id) {
+      setPreviewStream(null);
+      return;
     }
-  };
+
+    const getPreviewStream = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            mandatory: {
+              chromeMediaSource: "desktop",
+              chromeMediaSourceId: sourceId.id,
+            },
+          } as MediaTrackConstraints & {
+            mandatory: {
+              chromeMediaSource: string;
+              chromeMediaSourceId: string;
+            };
+          },
+          audio: false,
+        });
+        setPreviewStream(stream);
+      } catch (error) {
+        console.error("Error getting preview stream:", error);
+        setPreviewStream(null);
+      }
+    };
+
+    getPreviewStream();
+  }, [sourceId?.id]);
 
   const handleRecordingStateChange = (recording: boolean) => {
     setIsRecording(recording);
@@ -69,9 +83,7 @@ export default function ScreenRecorder() {
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">Fonte selecionada:</span>
               <span className="text-muted-foreground text-sm">
-                {selectedSourceId
-                  ? "✓ Fonte selecionada"
-                  : "Nenhuma fonte selecionada"}
+                {sourceId ? "✓ Fonte selecionada" : "Nenhuma fonte selecionada"}
               </span>
             </div>
             <div className="flex items-center justify-between">
@@ -98,14 +110,41 @@ export default function ScreenRecorder() {
         </CardContent>
       </Card>
 
+      {/* Informação sobre seleção de fonte */}
+      {!sourceId && (
+        <Card className="border-orange-200 bg-orange-50 transition-all duration-200 hover:shadow-lg/20 hover:shadow-lg dark:border-orange-800 dark:bg-orange-900/20">
+          <CardHeader>
+            <CardTitle className="text-lg text-orange-800 dark:text-orange-200">
+              ℹ️ Selecione uma fonte de captura
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <p className="text-orange-700 dark:text-orange-300">
+                Para usar o gravador de tela, primeiro selecione uma fonte de
+                captura na <strong>página inicial</strong> usando o seletor
+                "Escolha a cena para gravar". Depois retorne aqui para
+                configurar e iniciar a gravação.
+              </p>
+              <Link to="/">
+                <Button variant="outline" className="w-full">
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Ir para página inicial
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Video Preview */}
-      {(selectedSourceId || isRecording) && (
+      {(sourceId || isRecording) && (
         <Card className="transition-all duration-200 hover:shadow-lg/20 hover:shadow-lg">
           <CardHeader>
             <CardTitle className="text-lg">Preview</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="border-border aspect-video overflow-hidden rounded-xl border-2">
+            <div className="border-border relative aspect-video overflow-hidden rounded-xl border-2">
               <VideoPreviewWithHeader
                 stream={previewStream}
                 isRecording={isRecording}
@@ -117,23 +156,11 @@ export default function ScreenRecorder() {
 
       <Card className="transition-all duration-200 hover:shadow-lg/20 hover:shadow-lg">
         <CardHeader>
-          <CardTitle className="text-lg">Fonte de Captura</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <SourceSelector
-            onSourceSelected={handleSourceSelected}
-            disabled={isRecording}
-          />
-        </CardContent>
-      </Card>
-
-      <Card className="transition-all duration-200 hover:shadow-lg/20 hover:shadow-lg">
-        <CardHeader>
           <CardTitle className="text-lg">Controles</CardTitle>
         </CardHeader>
         <CardContent>
           <RecordingControls
-            selectedSourceId={selectedSourceId}
+            selectedSourceId={sourceId}
             onRecordingStateChange={handleRecordingStateChange}
             selectedSaveLocation={saveLocation}
           />
