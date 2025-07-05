@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, powerSaveBlocker } from "electron";
 import registerListeners from "./helpers/ipc/listeners-register";
 // "electron-squirrel-startup" seems broken when packaging with vite
 //import started from "electron-squirrel-startup";
@@ -13,19 +13,64 @@ const inDevelopment = process.env.NODE_ENV === "development";
 function createWindow() {
   const preload = path.join(__dirname, "preload.js");
   const mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
+    width: 1200,
+    height: 800,
     webPreferences: {
       devTools: inDevelopment,
       contextIsolation: true,
       nodeIntegration: true,
       nodeIntegrationInSubFrames: false,
-
+      webSecurity: false,
+      allowRunningInsecureContent: true,
+      backgroundThrottling: false,
       preload: preload,
     },
     titleBarStyle: "hidden",
+    show: false,
   });
   registerListeners(mainWindow);
+
+  // Handle camera permissions
+  mainWindow.webContents.session.setPermissionRequestHandler(
+    (webContents, permission, callback) => {
+      if (permission === "media") {
+        callback(true);
+      } else {
+        callback(false);
+      }
+    },
+  );
+
+  // Handle camera access
+  mainWindow.webContents.session.setPermissionCheckHandler(
+    (webContents, permission) => {
+      if (permission === "media") {
+        return true;
+      }
+      return false;
+    },
+  );
+
+  // Prevent system sleep during recording
+  const powerSaveId = powerSaveBlocker.start("prevent-display-sleep");
+  console.log(
+    "Power save blocker started:",
+    powerSaveBlocker.isStarted(powerSaveId),
+  );
+
+  // Show window when ready
+  mainWindow.once("ready-to-show", () => {
+    mainWindow.show();
+  });
+
+  // Prevent throttling when minimized
+  mainWindow.on("minimize", () => {
+    console.log("Window minimized - maintaining background activity");
+  });
+
+  mainWindow.on("restore", () => {
+    console.log("Window restored");
+  });
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
@@ -44,6 +89,11 @@ async function installExtensions() {
     console.error("Failed to install extensions");
   }
 }
+
+// Prevent app suspension
+app.commandLine.appendSwitch("disable-background-timer-throttling");
+app.commandLine.appendSwitch("disable-renderer-backgrounding");
+app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
 
 app.whenReady().then(createWindow).then(installExtensions);
 
