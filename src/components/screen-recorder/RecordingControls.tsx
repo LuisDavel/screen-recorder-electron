@@ -96,29 +96,8 @@ export function RecordingControls({
       );
 
       options.includeCameraOverlay = includeCameraOverlay && cameraEnabled;
-      options.includeHeader = true; // Forçado para teste
+      options.includeHeader = includeHeader && headerConfig.isEnabled;
       options.headerConfig = headerConfig;
-
-      // Debug completo das opções
-      console.log("🎬 INICIANDO GRAVAÇÃO - Opções completas:", {
-        sourceId: options.sourceId,
-        includeHeader: options.includeHeader,
-        headerConfig: options.headerConfig,
-        headerEnabled: headerConfig.isEnabled,
-        headerHeight: headerConfig.height,
-        examName: headerConfig.examName,
-      });
-
-      // Validação do header
-      if (options.includeHeader && (!headerConfig || !headerConfig.isEnabled)) {
-        console.error("❌ ERRO: Header solicitado mas configuração inválida");
-        showError("Header inválido - verifique as configurações");
-        return;
-      }
-
-      if (options.includeHeader && headerConfig.isEnabled) {
-        console.log("✅ HEADER VALIDADO - Será aplicado à gravação");
-      }
 
       await recorder.startRecording(options);
       setIsRecording(true);
@@ -127,9 +106,8 @@ export function RecordingControls({
       if (includeCameraOverlay && cameraEnabled) {
         message += " com câmera";
       }
-      if (options.includeHeader && headerConfig.isEnabled) {
+      if (includeHeader && headerConfig.isEnabled) {
         message += " com header informativo";
-        console.log("🎯 HEADER APLICADO: Gravação incluirá header sobreposto");
       }
       showSuccess(message);
     } catch (error) {

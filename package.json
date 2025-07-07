@@ -1,8 +1,8 @@
 {
-  "name": "electron-shadcn",
-  "productName": "electron-shadcn Template",
+  "name": "video-recorder-app",
+  "productName": "Video Recorder",
   "version": "1.0.0",
-  "description": "Electron Forge with shadcn-ui (Vite + Typescript)",
+  "description": "Professional video recording application with custom headers and screen capture capabilities",
   "main": ".vite/build/main.js",
   "private": true,
   "scripts": {
@@ -20,6 +20,18 @@
     "test:all": "vitest run && playwright test"
   },
   "author": "ROG <luan.roger.2003@gmail.com>",
+  "homepage": "https://github.com/your-username/video-recorder-app",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/video-recorder-app.git"
+  },
+  "keywords": [
+    "video",
+    "recorder",
+    "screen-capture",
+    "electron",
+    "macos"
+  ],
   "license": "MIT",
   "devDependencies": {
     "@electron-forge/cli": "^7.8.1",
@@ -27,6 +39,7 @@
     "@electron-forge/maker-dmg": "^7.8.1",
     "@electron-forge/maker-rpm": "^7.8.0",
     "@electron-forge/maker-squirrel": "^7.8.0",
+    "@electron-forge/maker-wix": "^7.8.1",
     "@electron-forge/maker-zip": "^7.8.1",
     "@electron-forge/plugin-auto-unpack-natives": "^7.8.1",
     "@electron-forge/plugin-fuses": "^7.8.1",
