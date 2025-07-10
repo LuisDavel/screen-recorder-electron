@@ -53,9 +53,77 @@ interface ScreenRecorderContext {
 		fileName?: string;
 	}>;
 	sendVideoChunk: (chunk: Buffer) => void;
-	onRecordingStarted: (callback: (event: any, data: any) => void) => void;
-	onRecordingStopped: (callback: (event: any) => void) => void;
+	onRecordingStarted: (
+		callback: (event: unknown, data: unknown) => void,
+	) => void;
+	onRecordingStopped: (callback: (event: unknown) => void) => void;
 	removeAllListeners: () => void;
+}
+
+// Adicionar a interface PermissionsContext
+interface PermissionsContext {
+	checkPermissions: () => Promise<{
+		camera: boolean;
+		microphone: boolean;
+		screenCapture: boolean;
+	}>;
+	requestPermissions: () => Promise<{
+		camera: boolean;
+		microphone: boolean;
+		screenCapture: boolean;
+	}>;
+	openScreenRecordingPreferences: () => Promise<{
+		success: boolean;
+		error?: string;
+	}>;
+}
+
+// Adicionar a interface DiagnosticContext
+interface DiagnosticContext {
+	runDiagnostic: () => Promise<{
+		totalIssues: number;
+		criticalIssues: number;
+		warningIssues: number;
+		infoIssues: number;
+		results: Array<{
+			category: "permissions" | "configuration" | "system" | "logs";
+			level: "info" | "warning" | "error";
+			title: string;
+			description: string;
+			solutions: string[];
+			autoFixAvailable: boolean;
+			details?: Record<string, unknown>;
+		}>;
+		systemInfo: {
+			platform: string;
+			appVersion: string;
+			electronVersion: string;
+			webSecurity: boolean;
+			logFileExists: boolean;
+			logFileSize: number;
+			lastLogEntry?: string;
+		};
+	}>;
+	autoFixPermissions: () => Promise<{
+		success: boolean;
+		error?: string;
+	}>;
+}
+
+// Adicionar a interface ProductionLogsContext
+interface ProductionLogsContext {
+	getLogInfo: () => Promise<{
+		logDirectory: string;
+		logFile: string;
+		exists: boolean;
+	}>;
+	openLogDirectory: () => Promise<void>;
+	openLogFile: () => Promise<void>;
+	logMessage: (
+		level: "INFO" | "WARN" | "ERROR",
+		message: string,
+		data?: Record<string, unknown> | string | boolean,
+	) => Promise<void>;
 }
 
 declare interface Window {
@@ -63,6 +131,9 @@ declare interface Window {
 	electronWindow: ElectronWindow;
 	platform: PlatformContext;
 	screenRecorder: ScreenRecorderContext;
+	permissions: PermissionsContext;
+	productionLogs: ProductionLogsContext;
+	diagnostic: DiagnosticContext;
 }
 
 // Adicionar o tipo PlatformType
