@@ -37,12 +37,8 @@ export function RecordingControls({
 	const [recordingTime, setRecordingTime] = useState(0);
 	const [countdown, setCountdown] = useState<number | null>(null);
 	const [recorder] = useState(() => new AdvancedScreenRecorderManager());
-	const [includeCameraOverlay, setIncludeCameraOverlay] = useState(false);
-	const [includeMicrophone, setIncludeMicrophone] = useState(false);
-	const [includeHeader, setIncludeHeader] = useState(false);
-	const [includeFooter, setIncludeFooter] = useState(false);
 
-	// Camera store e notifications
+	// Usar diretamente os stores sem duplicação
 	const { isEnabled: cameraEnabled, mainStream: cameraStream } =
 		useCameraConfigStore();
 	const { isEnabled: microphoneEnabled, mainStream: microphoneStream } =
@@ -112,30 +108,16 @@ export function RecordingControls({
 		try {
 			setIsLoading(true);
 
-			// Verificar se câmera está habilitada mas usuário quer incluir overlay
-			if (includeCameraOverlay && !cameraEnabled) {
-				showError(
-					"Câmera deve estar habilitada para incluir overlay na gravação",
-				);
-				return;
-			}
-
-			if (includeCameraOverlay && cameraEnabled && !cameraStream) {
+			// Verificar se câmera está habilitada e tem stream
+			if (cameraEnabled && !cameraStream) {
 				showError(
 					"Stream da câmera não disponível. Verifique as configurações da câmera",
 				);
 				return;
 			}
 
-			// Verificar se microfone está habilitado mas usuário quer incluir áudio
-			if (includeMicrophone && !microphoneEnabled) {
-				showError(
-					"Microfone deve estar habilitado para incluir áudio na gravação",
-				);
-				return;
-			}
-
-			if (includeMicrophone && microphoneEnabled && !microphoneStream) {
+			// Verificar se microfone está habilitado e tem stream
+			if (microphoneEnabled && !microphoneStream) {
 				showError(
 					"Stream do microfone não disponível. Verifique as configurações do microfone",
 				);
@@ -160,27 +142,28 @@ export function RecordingControls({
 				selectedSaveLocation,
 			);
 
-			options.includeCameraOverlay = includeCameraOverlay && cameraEnabled;
-			options.includeMicrophone = includeMicrophone && microphoneEnabled;
-			options.includeHeader = includeHeader && headerConfig.isEnabled;
+			// Usar diretamente os estados dos stores
+			options.includeCameraOverlay = cameraEnabled;
+			options.includeMicrophone = microphoneEnabled;
+			options.includeHeader = headerConfig.isEnabled;
 			options.headerConfig = headerConfig;
-			options.includeFooter = includeFooter && footerConfig.isEnabled;
+			options.includeFooter = footerConfig.isEnabled;
 			options.footerConfig = footerConfig;
 
 			await recorder.startRecording(options);
 			setIsRecording(true);
 
 			let message = "Gravação iniciada";
-			if (includeCameraOverlay && cameraEnabled) {
+			if (cameraEnabled) {
 				message += " com câmera";
 			}
-			if (includeMicrophone && microphoneEnabled) {
+			if (microphoneEnabled) {
 				message += " com áudio";
 			}
-			if (includeHeader && headerConfig.isEnabled) {
+			if (headerConfig.isEnabled) {
 				message += " com header informativo";
 			}
-			if (includeFooter && footerConfig.isEnabled) {
+			if (footerConfig.isEnabled) {
 				message += " com footer";
 			}
 			showSuccess(message);
@@ -276,145 +259,77 @@ export function RecordingControls({
 						</div>
 					</div>
 
-					{/* Camera Overlay Option */}
+					{/* Resumo das configurações que serão incluídas na gravação */}
 					{!isRecording && (
-						<div className="bg-muted/50 flex items-center justify-between rounded-xl p-4 backdrop-blur-sm">
-							<div className="flex items-center space-x-3">
-								{includeCameraOverlay && cameraEnabled ? (
-									<Camera className="h-4 w-4 text-green-600" />
-								) : (
-									<CameraOff className="h-4 w-4 text-gray-400" />
-								)}
-								<div className="flex flex-col">
-									<Label
-										htmlFor="camera-overlay"
-										className="text-sm font-medium"
+						<div className="bg-muted/50 rounded-xl p-4 backdrop-blur-sm">
+							<div className="flex items-center space-x-2 mb-3">
+								<FileText className="h-4 w-4 text-blue-600" />
+								<Label className="text-sm font-medium">
+									Configurações da Gravação
+								</Label>
+							</div>
+							<div className="grid grid-cols-2 gap-2 text-xs">
+								<div className="flex items-center space-x-2">
+									{cameraEnabled && cameraStream ? (
+										<Camera className="h-3 w-3 text-green-600" />
+									) : (
+										<CameraOff className="h-3 w-3 text-gray-400" />
+									)}
+									<span
+										className={
+											cameraEnabled ? "text-green-600" : "text-gray-400"
+										}
 									>
-										Incluir câmera na gravação
-									</Label>
-									<span className="text-muted-foreground text-xs">
-										{cameraEnabled
-											? "Câmera será sobreposta ao vídeo"
-											: "Habilite a câmera primeiro"}
+										{cameraEnabled ? "Câmera incluída" : "Câmera desabilitada"}
 									</span>
 								</div>
-							</div>
-							<Switch
-								id="camera-overlay"
-								checked={includeCameraOverlay}
-								onCheckedChange={setIncludeCameraOverlay}
-								disabled={!cameraEnabled}
-							/>
-						</div>
-					)}
-
-					{/* Microphone Option */}
-					{!isRecording && (
-						<div className="bg-muted/50 flex items-center justify-between rounded-xl p-4 backdrop-blur-sm">
-							<div className="flex items-center space-x-3">
-								{includeMicrophone && microphoneEnabled ? (
-									<Mic className="h-4 w-4 text-green-600" />
-								) : (
-									<MicOff className="h-4 w-4 text-gray-400" />
-								)}
-								<div className="flex flex-col">
-									<Label
-										htmlFor="microphone-overlay"
-										className="text-sm font-medium"
+								<div className="flex items-center space-x-2">
+									{microphoneEnabled && microphoneStream ? (
+										<Mic className="h-3 w-3 text-green-600" />
+									) : (
+										<MicOff className="h-3 w-3 text-gray-400" />
+									)}
+									<span
+										className={
+											microphoneEnabled ? "text-green-600" : "text-gray-400"
+										}
 									>
-										Incluir microfone na gravação
-									</Label>
-									<span className="text-muted-foreground text-xs">
 										{microphoneEnabled
-											? "Áudio do microfone será incluído no vídeo"
-											: "Habilite o microfone primeiro"}
+											? "Microfone incluído"
+											: "Microfone desabilitado"}
 									</span>
 								</div>
-							</div>
-							<Switch
-								id="microphone-overlay"
-								checked={includeMicrophone}
-								onCheckedChange={setIncludeMicrophone}
-								disabled={!microphoneEnabled}
-							/>
-						</div>
-					)}
-
-					{/* Header Option */}
-					{!isRecording && (
-						<div className="bg-muted/50 flex items-center justify-between rounded-xl p-4 backdrop-blur-sm">
-							<div className="flex items-center space-x-3">
-								<FileText
-									className={`h-4 w-4 ${includeHeader && headerConfig.isEnabled ? "text-blue-600" : "text-gray-400"}`}
-								/>
-								<div className="flex flex-col">
-									<Label
-										htmlFor="header-overlay"
-										className="text-sm font-medium"
+								<div className="flex items-center space-x-2">
+									<FileText
+										className={`h-3 w-3 ${headerConfig.isEnabled ? "text-blue-600" : "text-gray-400"}`}
+									/>
+									<span
+										className={
+											headerConfig.isEnabled ? "text-blue-600" : "text-gray-400"
+										}
 									>
-										Incluir header informativo
-									</Label>
-									<span className="text-muted-foreground text-xs">
 										{headerConfig.isEnabled
-											? "Header será adicionado na parte superior do vídeo"
-											: "Configure o header nas configurações"}
+											? "Header incluído"
+											: "Header desabilitado"}
 									</span>
 								</div>
-							</div>
-							<Switch
-								id="header-overlay"
-								checked={includeHeader}
-								onCheckedChange={setIncludeHeader}
-								disabled={!headerConfig.isEnabled}
-							/>
-						</div>
-					)}
-
-					{/* Footer Option */}
-					{!isRecording && (
-						<div className="bg-muted/50 flex items-center justify-between rounded-xl p-4 backdrop-blur-sm">
-							<div className="flex items-center space-x-3">
-								<Square
-									className={`h-4 w-4 ${includeFooter && footerConfig.isEnabled ? "text-blue-600" : "text-gray-400"}`}
-								/>
-								<div className="flex flex-col">
-									<Label
-										htmlFor="footer-overlay"
-										className="text-sm font-medium"
+								<div className="flex items-center space-x-2">
+									<Square
+										className={`h-3 w-3 ${footerConfig.isEnabled ? "text-blue-600" : "text-gray-400"}`}
+									/>
+									<span
+										className={
+											footerConfig.isEnabled ? "text-blue-600" : "text-gray-400"
+										}
 									>
-										Incluir footer (rodapé)
-									</Label>
-									<span className="text-muted-foreground text-xs">
 										{footerConfig.isEnabled
-											? "Footer será adicionado na parte inferior do vídeo"
-											: "Configure o footer nas configurações"}
+											? "Footer incluído"
+											: "Footer desabilitado"}
 									</span>
 								</div>
 							</div>
-							<Switch
-								id="footer-overlay"
-								checked={includeFooter}
-								onCheckedChange={setIncludeFooter}
-								disabled={!footerConfig.isEnabled}
-							/>
-						</div>
-					)}
-
-					{(!selectedSourceId || !selectedSaveLocation) && (
-						<div className="rounded-xl border border-orange-200 bg-orange-50 p-5 dark:border-orange-800 dark:bg-orange-900/20">
-							<div className="space-y-2">
-								{!selectedSourceId && (
-									<p className="text-sm text-orange-800 dark:text-orange-200">
-										⚠️ Selecione uma fonte de captura antes de iniciar a
-										gravação.
-									</p>
-								)}
-								{!selectedSaveLocation && (
-									<p className="text-sm text-orange-800 dark:text-orange-200">
-										⚠️ Selecione um local para salvar o vídeo antes de iniciar a
-										gravação.
-									</p>
-								)}
+							<div className="mt-3 text-xs text-muted-foreground">
+								Use as configurações à direita para ativar/desativar os recursos
 							</div>
 						</div>
 					)}
