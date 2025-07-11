@@ -175,12 +175,6 @@ export class AdvancedScreenRecorderManager {
 		audioStream: MediaStream | null,
 		options: AdvancedRecordingOptions,
 	): Promise<MediaStream> {
-		console.log("Configurando compositor de vídeo", {
-			includeCamera: options.includeCameraOverlay,
-			includeHeader: options.includeHeader,
-			headerEnabled: options.headerConfig?.isEnabled,
-		});
-
 		let currentStream = screenStream;
 
 		// First, apply camera overlay if needed

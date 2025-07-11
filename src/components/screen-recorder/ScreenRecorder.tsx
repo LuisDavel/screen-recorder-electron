@@ -178,10 +178,6 @@ export default React.memo(function ScreenRecorder() {
 					/>
 				</CardContent>
 			</Card>
-
-			{/* Teste de Debug */}
-
-			{/* Status */}
 		</div>
 	);
 });

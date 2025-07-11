@@ -18,6 +18,7 @@ export interface CameraConfig {
 	size: "small" | "medium" | "large";
 	mainStream: MediaStream | null;
 	isLoading: boolean;
+	isInitializing: boolean;
 	currentConstraints: MediaTrackConstraints | null;
 	deviceList: MediaDeviceInfo[];
 	hasPermission: boolean;
@@ -36,6 +37,7 @@ export interface CameraConfigActions {
 	setSize: (size: CameraConfig["size"]) => void;
 	setMainStream: (stream: MediaStream | null) => void;
 	setIsLoading: (isLoading: boolean) => void;
+	setIsInitializing: (initializing: boolean) => void;
 	setCurrentConstraints: (constraints: MediaTrackConstraints | null) => void;
 	setDeviceList: (devices: MediaDeviceInfo[]) => void;
 	setHasPermission: (hasPermission: boolean) => void;
@@ -73,6 +75,7 @@ export const useCameraConfigStore = create<CameraConfigStore>()(
 			size: "medium",
 			mainStream: null,
 			isLoading: false,
+			isInitializing: false,
 			currentConstraints: null,
 			deviceList: [],
 			hasPermission: false,
@@ -89,6 +92,8 @@ export const useCameraConfigStore = create<CameraConfigStore>()(
 			setSize: (size) => set({ size }),
 			setMainStream: (stream) => set({ mainStream: stream }),
 			setIsLoading: (isLoading) => set({ isLoading }),
+			setIsInitializing: (initializing) =>
+				set({ isInitializing: initializing }),
 			setCurrentConstraints: (constraints) =>
 				set({ currentConstraints: constraints }),
 			setDeviceList: (devices) => set({ deviceList: devices }),
