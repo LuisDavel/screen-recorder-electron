@@ -24,15 +24,15 @@ interface HeaderConfigStore {
 const defaultHeaderConfig: HeaderConfig = {
 	isEnabled: true,
 	height: 80,
-	examName: "Ex: Ultrassonografia Abdominal",
+	examName: "Ultrassonografia Abdominal",
 	examDate: "2025-07-05",
 	patientName: "Nome completo do paciente",
 	patientSex: "Masculino" as const,
-	patientAge: "Ex: 35 anos",
+	patientAge: "35 anos",
 	institutionName: "Nome do hospital, clínica ou laboratório",
 	requestingDoctor: "Nome do médico",
-	crm: "Ex: 12345/SP",
-	externalId: "Código ou ID do sistema externo",
+	crm: "12345/SP",
+	externalId: "Código/ID",
 };
 
 export const useHeaderConfigStore = create<HeaderConfigStore>()(
