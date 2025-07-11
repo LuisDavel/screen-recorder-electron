@@ -1,5 +1,7 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
 	Dialog,
 	DialogContent,
@@ -7,16 +9,23 @@ import {
 	DialogTitle,
 	DialogTrigger,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Camera } from "lucide-react";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import {
 	useCameraConfigStore,
-	type CameraPosition,
-	type CameraSize,
+	type CameraConfig,
 } from "@/store/store-camera-config";
-import { ComboBox } from "./ComboBox";
+import { Camera } from "lucide-react";
 import { useDeviceInitialization } from "@/hooks/useDeviceInitialization";
+
+// Type aliases for better readability
+type CameraPosition = CameraConfig["position"];
+type CameraSize = CameraConfig["size"];
 
 interface CameraConfigDialogProps {
 	trigger?: React.ReactNode;
@@ -194,17 +203,21 @@ export function CameraConfigDialog({ trigger }: CameraConfigDialogProps) {
 					{/* Device Selection */}
 					<div className="grid gap-2">
 						<Label>Dispositivo</Label>
-						<ComboBox
-							data={
-								devices?.map((device) => ({
-									value: device.deviceId,
-									label: device.label,
-								})) || []
-							}
+						<Select
 							value={selectedDeviceId || ""}
-							onChange={setSelectedDeviceId}
-							placeholder="Selecione uma câmera"
-						/>
+							onValueChange={setSelectedDeviceId}
+						>
+							<SelectTrigger>
+								<SelectValue placeholder="Selecione uma câmera" />
+							</SelectTrigger>
+							<SelectContent>
+								{devices?.map((device) => (
+									<SelectItem key={device.deviceId} value={device.deviceId}>
+										{device.label}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
 					</div>
 
 					{/* Camera Preview */}
@@ -234,23 +247,35 @@ export function CameraConfigDialog({ trigger }: CameraConfigDialogProps) {
 					{/* Position */}
 					<div className="grid gap-2">
 						<Label>Posição</Label>
-						<ComboBox
-							data={positionOptions}
-							value={position}
-							onChange={handlePositionChange}
-							placeholder="Selecione uma posição"
-						/>
+						<Select value={position} onValueChange={handlePositionChange}>
+							<SelectTrigger>
+								<SelectValue placeholder="Selecione uma posição" />
+							</SelectTrigger>
+							<SelectContent>
+								{positionOptions.map((option) => (
+									<SelectItem key={option.value} value={option.value}>
+										{option.label}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
 					</div>
 
 					{/* Size */}
 					<div className="grid gap-2">
 						<Label>Tamanho</Label>
-						<ComboBox
-							data={sizeOptions}
-							value={size}
-							onChange={handleSizeChange}
-							placeholder="Selecione um tamanho"
-						/>
+						<Select value={size} onValueChange={handleSizeChange}>
+							<SelectTrigger>
+								<SelectValue placeholder="Selecione um tamanho" />
+							</SelectTrigger>
+							<SelectContent>
+								{sizeOptions.map((option) => (
+									<SelectItem key={option.value} value={option.value}>
+										{option.label}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
 					</div>
 				</div>
 			</DialogContent>

@@ -12,6 +12,13 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import {
 	Folder,
 	FolderOpen,
 	Monitor,
@@ -21,7 +28,13 @@ import {
 	Settings,
 } from "lucide-react";
 
-import { ComboBox } from "../ComboBox";
+// Import type from types.d.ts
+interface DefaultSaveLocations {
+	desktop: string;
+	documents: string;
+	videos: string;
+	downloads: string;
+}
 
 interface SaveLocationSelectorProps {
 	onLocationSelected: (location: string) => void;
@@ -134,12 +147,24 @@ export function SaveLocationSelector({
 			</CardHeader>
 			<CardContent className="overflow-y-auto max-h-[calc(100vh-450px)]">
 				<h4 className="text-sm font-medium">Locais recomendados</h4>
-				<ComboBox
-					onChange={handleLocationSelect}
+				<Select
 					value={selectedLocation || ""}
-					data={defaultLocationsData}
-					placeholder="Selecione um local"
-				/>
+					onValueChange={handleLocationSelect}
+				>
+					<SelectTrigger>
+						<SelectValue placeholder="Selecione um local" />
+					</SelectTrigger>
+					<SelectContent>
+						{defaultLocationsData.map((location) => (
+							<SelectItem key={location.value} value={location.value}>
+								<div className="flex items-center space-x-2">
+									{location.icon}
+									<span>{location.label}</span>
+								</div>
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
 			</CardContent>
 			<CardFooter>
 				<div className="space-y-2 w-full">

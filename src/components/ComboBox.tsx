@@ -32,6 +32,8 @@ export function ComboBox({
 }) {
 	const [open, setOpen] = React.useState(false);
 
+	const selectedItem = data.find((item) => item.value === value);
+
 	return (
 		<Popover open={open} onOpenChange={setOpen}>
 			<PopoverTrigger asChild>
@@ -41,22 +43,23 @@ export function ComboBox({
 					aria-expanded={open}
 					className="w-full justify-between"
 				>
-					{value ? (
-						<div className="flex items-center space-x-2 w-[90%]">
-							{data.find((item) => item.value === value)?.icon}
-							<p className="text-left w-full text-ellipsis overflow-hidden">
-								{data.find((item) => item.value === value)?.label}
-							</p>
+					{selectedItem ? (
+						<div className="flex items-center space-x-2 flex-1 overflow-hidden">
+							{selectedItem.icon}
+							<span className="text-left truncate">{selectedItem.label}</span>
 						</div>
 					) : (
-						placeholder
+						<span className="text-muted-foreground">{placeholder}</span>
 					)}
 					<ChevronsUpDownIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
 				</Button>
 			</PopoverTrigger>
-			<PopoverContent align="start" className="w-full p-0">
+			<PopoverContent
+				align="start"
+				className="w-[var(--radix-popover-trigger-width)] p-0"
+				style={{ zIndex: 9999 }}
+			>
 				<Command>
-					{/* <CommandInput placeholder="Pesquisar..." /> */}
 					<CommandList>
 						<CommandEmpty>Nenhum item encontrado.</CommandEmpty>
 						<CommandGroup>
@@ -64,19 +67,21 @@ export function ComboBox({
 								<CommandItem
 									key={item.value}
 									value={item.value}
-									onSelect={(currentValue) => {
-										onChange(currentValue === value ? "" : currentValue);
+									onSelect={() => {
+										onChange(item.value);
 										setOpen(false);
 									}}
 								>
-									{item.icon}
-									{item.label}
-									<CheckIcon
-										className={cn(
-											"ml-2 h-4 w-4",
-											value === item.value ? "opacity-100" : "opacity-0",
-										)}
-									/>
+									<div className="flex items-center space-x-2 w-full">
+										{item.icon}
+										<span className="flex-1 text-left">{item.label}</span>
+										<CheckIcon
+											className={cn(
+												"h-4 w-4",
+												value === item.value ? "opacity-100" : "opacity-0",
+											)}
+										/>
+									</div>
 								</CommandItem>
 							))}
 						</CommandGroup>

@@ -1,5 +1,7 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
 	Dialog,
 	DialogContent,
@@ -7,14 +9,18 @@ import {
 	DialogTitle,
 	DialogTrigger,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Mic, Volume2 } from "lucide-react";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import {
 	useMicrophoneConfigStore,
 	type MicrophoneGain,
 } from "@/store/store-microphone-config";
-import { ComboBox } from "./ComboBox";
+import { Mic, Volume2 } from "lucide-react";
 import { useDeviceInitialization } from "@/hooks/useDeviceInitialization";
 
 interface MicrophoneConfigDialogProps {
@@ -219,17 +225,21 @@ export function MicrophoneConfigDialog({
 					{/* Device Selection */}
 					<div className="grid gap-2">
 						<Label>Dispositivo</Label>
-						<ComboBox
-							data={
-								devices?.map((device) => ({
-									value: device.deviceId,
-									label: device.label,
-								})) || []
-							}
+						<Select
 							value={selectedDeviceId || ""}
-							onChange={setSelectedDeviceId}
-							placeholder="Selecione um microfone"
-						/>
+							onValueChange={setSelectedDeviceId}
+						>
+							<SelectTrigger>
+								<SelectValue placeholder="Selecione um microfone" />
+							</SelectTrigger>
+							<SelectContent>
+								{devices?.map((device) => (
+									<SelectItem key={device.deviceId} value={device.deviceId}>
+										{device.label}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
 					</div>
 
 					{/* Audio Level Monitor */}
@@ -254,12 +264,18 @@ export function MicrophoneConfigDialog({
 					{/* Gain Control */}
 					<div className="grid gap-2">
 						<Label>Ganho</Label>
-						<ComboBox
-							data={gainOptions}
-							value={gain}
-							onChange={handleGainChange}
-							placeholder="Selecione o ganho"
-						/>
+						<Select value={gain} onValueChange={handleGainChange}>
+							<SelectTrigger>
+								<SelectValue placeholder="Selecione o ganho" />
+							</SelectTrigger>
+							<SelectContent>
+								{gainOptions.map((option) => (
+									<SelectItem key={option.value} value={option.value}>
+										{option.label}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
 					</div>
 
 					{/* Audio Processing Options */}
