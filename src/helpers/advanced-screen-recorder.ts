@@ -467,13 +467,13 @@ export class AdvancedScreenRecorderManager {
 
 		console.warn("⚠️ Formato selecionado não suportado, tentando fallback");
 
-		// Fallback to supported types
+		// Fallback to supported types (otimizado para performance)
 		const supportedTypes = [
+			"video/webm; codecs=vp8", // VP8 é mais leve que VP9
 			"video/webm; codecs=vp9",
-			"video/webm; codecs=vp8",
 			"video/webm",
+			"video/mp4", // MP4 básico sem codec específico para melhor compatibilidade
 			"video/mp4; codecs=h264",
-			"video/mp4",
 		];
 
 		for (const type of supportedTypes) {
@@ -529,8 +529,44 @@ export class AdvancedScreenRecorderManager {
 				});
 			}
 
-			// Aplicar otimizações do WhatsApp se necessário
+			// Aplicar otimizações específicas para MP4
 			const videoFormatState = useVideoFormatStore.getState();
+			if (videoFormatState.format === "mp4") {
+				console.log("🎬 MP4 detectado - aplicando otimizações específicas");
+
+				// Reduzir configurações para MP4 no Windows
+				if (isWindows) {
+					options.videoBitrate = Math.min(
+						options.videoBitrate || 1000000,
+						1000000,
+					); // Máximo 1 Mbps
+					options.frameRate = Math.min(options.frameRate || 20, 20); // Máximo 20 FPS
+
+					// Reduzir resolução se muito alta
+					if (options.outputWidth && options.outputWidth > 1280) {
+						options.outputWidth = 1280;
+						options.outputHeight = Math.round((options.outputWidth * 9) / 16); // Manter aspect ratio 16:9
+					}
+				} else {
+					// Configurações mais conservadoras para MP4 em geral
+					options.videoBitrate = Math.min(
+						options.videoBitrate || 1500000,
+						1500000,
+					); // Máximo 1.5 Mbps
+					options.frameRate = Math.min(options.frameRate || 25, 25); // Máximo 25 FPS
+				}
+
+				console.log("🎯 Configurações otimizadas para MP4:", {
+					bitrate: options.videoBitrate,
+					frameRate: options.frameRate,
+					resolucao: options.outputWidth
+						? `${options.outputWidth}x${options.outputHeight}`
+						: "auto",
+					plataforma: isWindows ? "Windows" : "Outros",
+				});
+			}
+
+			// Aplicar otimizações do WhatsApp se necessário
 			if (videoFormatState.format === "whatsapp") {
 				const whatsappSettings =
 					videoFormatState.getWhatsAppOptimizedSettings();
@@ -611,8 +647,16 @@ export class AdvancedScreenRecorderManager {
 			// Configurar event listeners
 			this.setupRecorderListeners();
 
-			// Iniciar gravação com chunks maiores para melhor performance
-			this.mediaRecorder.start(5000); // Chunk a cada 5 segundos (otimizado para Windows)
+			// Otimizar tamanho dos chunks baseado no formato
+			let chunkInterval = 5000; // Padrão: 5 segundos
+			if (videoFormatState.format === "mp4") {
+				// MP4/H.264 funciona melhor com chunks maiores
+				chunkInterval = 10000; // 10 segundos para MP4
+				console.log("🎬 Usando chunks maiores para MP4:", chunkInterval + "ms");
+			}
+
+			// Iniciar gravação com chunks otimizados
+			this.mediaRecorder.start(chunkInterval);
 			this.isRecording = true;
 			this.recordedChunks = [];
 
@@ -667,6 +711,19 @@ export class AdvancedScreenRecorderManager {
 						{
 							chunkSize: event.data.size,
 							recomendação: "Considere reduzir qualidade ou frame rate",
+						},
+					);
+				}
+
+				// Detectar problemas específicos com MP4/H.264
+				const videoFormatState = useVideoFormatStore.getState();
+				if (videoFormatState.format === "mp4" && event.data.size < 30000) {
+					console.warn(
+						"⚠️ Performance baixa detectada com MP4 - chunks muito pequenos",
+						{
+							chunkSize: event.data.size,
+							formato: "MP4",
+							recomendação: "MP4 pode estar sobrecarregando o sistema",
 						},
 					);
 				}
@@ -980,6 +1037,35 @@ export class AdvancedScreenRecorderManager {
 		sourceId: string,
 		saveLocation?: string,
 	): AdvancedRecordingOptions {
+		// Detectar se está usando MP4 para aplicar configurações mais conservadoras
+		const videoFormatState = useVideoFormatStore.getState();
+		const isMP4 = videoFormatState.format === "mp4";
+		const isWindows =
+			typeof navigator !== "undefined" &&
+			navigator.platform.toLowerCase().includes("win");
+
+		// Configurações específicas para MP4
+		const mp4Config = {
+			frameRate: isWindows ? 15 : 20, // Ainda mais baixo para MP4 no Windows
+			videoBitrate: isWindows ? 800000 : 1200000, // Mais conservador para MP4
+		};
+
+		// Configurações padrão
+		const defaultConfig = {
+			frameRate: 25,
+			videoBitrate: 1500000,
+		};
+
+		const config = isMP4 ? mp4Config : defaultConfig;
+
+		console.log("🎬 Configurações recomendadas:", {
+			formato: videoFormatState.format,
+			plataforma: isWindows ? "Windows" : "Outros",
+			frameRate: config.frameRate,
+			bitrate: config.videoBitrate,
+			otimizado: isMP4 ? "MP4" : "Padrão",
+		});
+
 		return {
 			sourceId,
 			saveLocation,
@@ -989,11 +1075,11 @@ export class AdvancedScreenRecorderManager {
 			headerConfig: undefined,
 			includeFooter: false,
 			footerConfig: undefined,
-			// Configurações otimizadas para Windows
+			// Configurações otimizadas baseadas no formato
 			outputWidth: undefined, // Será detectado automaticamente
 			outputHeight: undefined, // Será detectado automaticamente
-			frameRate: 25, // Reduzido para melhor performance
-			videoBitrate: 1500000, // 1.5 Mbps - mais leve para Windows
+			frameRate: config.frameRate,
+			videoBitrate: config.videoBitrate,
 		};
 	}
 }

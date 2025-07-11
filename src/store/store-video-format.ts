@@ -108,19 +108,19 @@ export const useVideoFormatStore = create<VideoFormatState>()(
 				let codecs: string[] = [];
 
 				if (format === "webm") {
-					codecs = ["vp9", "vp8", "av01"];
+					codecs = ["vp8", "vp9", "av01"]; // VP8 primeiro por ser mais leve
 				} else if (format === "whatsapp") {
 					// WhatsApp works best with H.264
 					codecs = ["h264", "avc1"];
 				} else {
-					// Try various MP4 codec formats that are commonly supported
+					// MP4 codecs ordenados por performance (mais leves primeiro)
 					codecs = [
-						"h264",
-						"avc1",
-						"avc1.42E01E",
-						"avc1.42001E",
-						"avc1.4D401E",
-						"avc1.640028",
+						"h264", // Básico H.264
+						"avc1", // Básico AVC1
+						"avc1.42001E", // Baseline profile - mais leve
+						"avc1.42E01E", // Extended profile
+						"avc1.4D401E", // Main profile
+						"avc1.640028", // High profile - mais pesado
 					];
 				}
 
@@ -204,19 +204,37 @@ export const useVideoFormatStore = create<VideoFormatState>()(
 					MediaRecorder.isTypeSupported(mimeType);
 
 				if (!isSupported) {
-					// Fall back to basic format without codec specification
-					const basicMimeType = format === "webm" ? "video/webm" : "video/mp4";
-					const basicSupported =
+					// Para MP4, tentar formato básico primeiro para melhor compatibilidade
+					if (format === "mp4" || format === "whatsapp") {
+						const basicMimeType = "video/mp4";
+						const basicSupported =
+							typeof MediaRecorder !== "undefined" &&
+							MediaRecorder.isTypeSupported(basicMimeType);
+
+						console.log(
+							`⚠️ Codec MP4 específico não suportado (${mimeType}), usando formato básico (${basicMimeType}):`,
+							basicSupported,
+						);
+
+						if (basicSupported) {
+							return basicMimeType;
+						}
+					}
+
+					// Fallback para WebM se MP4 não funcionar
+					const fallbackMimeType =
+						format === "webm" ? "video/webm" : "video/webm";
+					const fallbackSupported =
 						typeof MediaRecorder !== "undefined" &&
-						MediaRecorder.isTypeSupported(basicMimeType);
+						MediaRecorder.isTypeSupported(fallbackMimeType);
 
 					console.log(
-						`⚠️ Codec específico não suportado (${mimeType}), usando formato básico (${basicMimeType}):`,
-						basicSupported,
+						`⚠️ Codec específico não suportado (${mimeType}), usando fallback (${fallbackMimeType}):`,
+						fallbackSupported,
 					);
 
-					if (basicSupported) {
-						return basicMimeType;
+					if (fallbackSupported) {
+						return fallbackMimeType;
 					}
 				}
 
