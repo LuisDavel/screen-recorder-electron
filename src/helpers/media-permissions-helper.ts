@@ -24,8 +24,9 @@ export class MediaPermissionsHelper {
 				console.log("Attempting to access camera...");
 				const cameraStream = await navigator.mediaDevices.getUserMedia({
 					video: {
-						width: { ideal: 320 },
-						height: { ideal: 240 },
+						width: { ideal: 1280, max: 1920 },
+						height: { ideal: 720, max: 1080 },
+						frameRate: { ideal: 30, max: 60 },
 					},
 					audio: false,
 				});

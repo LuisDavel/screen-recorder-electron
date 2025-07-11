@@ -101,6 +101,19 @@ export class VideoComposer {
 			this.cameraVideo.autoplay = true;
 			this.cameraVideo.muted = true;
 			this.cameraVideo.playsInline = true;
+
+			// Aguardar metadados da câmera para garantir aspect ratio correto
+			this.cameraVideo.addEventListener("loadedmetadata", () => {
+				console.log("🎥 Câmera carregada com dimensões:", {
+					width: this.cameraVideo?.videoWidth,
+					height: this.cameraVideo?.videoHeight,
+					aspectRatio: this.cameraVideo
+						? (
+								this.cameraVideo.videoWidth / this.cameraVideo.videoHeight
+							).toFixed(3)
+						: "N/A",
+				});
+			});
 		}
 
 		console.log("VideoComposer inicializado", {
@@ -124,15 +137,48 @@ export class VideoComposer {
 		const canvasWidth = this.canvas.width;
 		const canvasHeight = this.canvas.height;
 
-		// Definir tamanhos da câmera baseados no canvas
-		const sizeMap = {
-			small: { width: canvasWidth * 0.15, height: canvasHeight * 0.15 },
-			medium: { width: canvasWidth * 0.2, height: canvasHeight * 0.2 },
-			large: { width: canvasWidth * 0.25, height: canvasHeight * 0.25 },
+		console.log("🎥 Calculando configurações da câmera:", {
+			canvas: `${canvasWidth}x${canvasHeight}`,
+			cameraVideoReadyState: this.cameraVideo?.readyState || 0,
+			cameraVideoDimensions: this.cameraVideo
+				? `${this.cameraVideo.videoWidth}x${this.cameraVideo.videoHeight}`
+				: "N/A",
+		});
+
+		// Definir tamanhos base da câmera como porcentagem do canvas
+		const sizePercentages = {
+			small: 0.15, // 15% da altura do canvas
+			medium: 0.2, // 20% da altura do canvas
+			large: 0.25, // 25% da altura do canvas
 		};
 
-		const { width, height } = sizeMap[this.options.cameraSize];
-		const margin = 20;
+		const sizePercentage = sizePercentages[this.options.cameraSize];
+
+		// Usar altura como base para cálculo (mais estável)
+		const baseHeight = canvasHeight * sizePercentage;
+
+		// Para o espaço da câmera, usar um aspect ratio padrão de 16:9
+		// O aspect ratio real será preservado na renderização
+		const containerAspectRatio = 16 / 9;
+		const baseWidth = baseHeight * containerAspectRatio;
+
+		// Garantir que não exceda limites do canvas
+		const maxWidth = canvasWidth * 0.3; // Máximo 30% da largura
+		const maxHeight = canvasHeight * 0.3; // Máximo 30% da altura
+
+		let finalWidth = Math.min(baseWidth, maxWidth);
+		let finalHeight = Math.min(baseHeight, maxHeight);
+
+		// Ajustar proporcionalmente se necessário
+		if (finalWidth !== baseWidth) {
+			finalHeight = finalWidth / containerAspectRatio;
+		} else if (finalHeight !== baseHeight) {
+			finalWidth = finalHeight * containerAspectRatio;
+		}
+
+		const width = Math.round(finalWidth);
+		const height = Math.round(finalHeight);
+		const margin = 15;
 
 		// Calcular posição
 		let x = 0;
@@ -157,11 +203,22 @@ export class VideoComposer {
 				break;
 		}
 
+		console.log("📐 Configurações finais da câmera:", {
+			containerSize: `${width}x${height}`,
+			containerAspectRatio: (width / height).toFixed(3),
+			posição: `${x}, ${y}`,
+			percentualCanvas: {
+				width: ((width / canvasWidth) * 100).toFixed(1) + "%",
+				height: ((height / canvasHeight) * 100).toFixed(1) + "%",
+			},
+			tamanho: this.options.cameraSize,
+		});
+
 		return {
 			position: this.options.cameraPosition,
 			size: this.options.cameraSize,
-			width: Math.round(width),
-			height: Math.round(height),
+			width,
+			height,
 			x: Math.round(x),
 			y: Math.round(y),
 		};
@@ -326,13 +383,62 @@ export class VideoComposer {
 					cameraSettings.height + 2,
 				);
 
-				// Desenhar câmera sobreposicionada
-				this.ctx.drawImage(
-					this.cameraVideo,
+				// Obter dimensões reais da câmera
+				const cameraVideoWidth = this.cameraVideo.videoWidth || 640;
+				const cameraVideoHeight = this.cameraVideo.videoHeight || 480;
+				const cameraAspectRatio = cameraVideoWidth / cameraVideoHeight;
+
+				// Dimensões do espaço disponível para a câmera
+				const targetWidth = cameraSettings.width;
+				const targetHeight = cameraSettings.height;
+				const targetAspectRatio = targetWidth / targetHeight;
+
+				// Calcular dimensões de renderização que preservem o aspect ratio (object-fit: contain)
+				let renderWidth = targetWidth;
+				let renderHeight = targetHeight;
+				let offsetX = 0;
+				let offsetY = 0;
+
+				if (cameraAspectRatio > targetAspectRatio) {
+					// Câmera é mais larga - ajustar altura
+					renderHeight = targetWidth / cameraAspectRatio;
+					offsetY = (targetHeight - renderHeight) / 2;
+				} else {
+					// Câmera é mais alta - ajustar largura
+					renderWidth = targetHeight * cameraAspectRatio;
+					offsetX = (targetWidth - renderWidth) / 2;
+				}
+
+				console.log("🎥 Renderizando câmera com aspect ratio preservado:", {
+					cameraOriginal: `${cameraVideoWidth}x${cameraVideoHeight}`,
+					cameraAspectRatio: cameraAspectRatio.toFixed(3),
+					targetSpace: `${targetWidth}x${targetHeight}`,
+					targetAspectRatio: targetAspectRatio.toFixed(3),
+					renderFinal: `${Math.round(renderWidth)}x${Math.round(renderHeight)}`,
+					offset: `${Math.round(offsetX)}, ${Math.round(offsetY)}`,
+					preservandoAspectRatio: "SIM",
+				});
+
+				// Preencher fundo da área da câmera com preto
+				this.ctx.fillStyle = "#000000";
+				this.ctx.fillRect(
 					cameraSettings.x,
 					cameraSettings.y,
 					cameraSettings.width,
 					cameraSettings.height,
+				);
+
+				// Desenhar câmera preservando aspect ratio (como object-fit: contain)
+				this.ctx.drawImage(
+					this.cameraVideo,
+					0,
+					0, // source x, y (usar câmera completa)
+					cameraVideoWidth,
+					cameraVideoHeight, // source width, height (usar câmera completa)
+					cameraSettings.x + offsetX,
+					cameraSettings.y + offsetY, // destination x, y (com offset para centralizar)
+					renderWidth,
+					renderHeight, // destination width, height (preservando aspect ratio)
 				);
 			}
 		} catch (error) {
@@ -364,23 +470,37 @@ export class VideoComposer {
 
 		// Aguardar vídeos carregarem
 		const waitForVideos = () => {
-			if (this.screenVideo.readyState >= 2) {
-				if (!this.cameraVideo || this.cameraVideo.readyState >= 2) {
-					// Ajustar canvas para corresponder ao aspect ratio do vídeo
-					this.adjustCanvasToVideoAspectRatio();
+			const screenReady = this.screenVideo.readyState >= 2;
+			const cameraReady =
+				!this.cameraVideo ||
+				(this.cameraVideo.readyState >= 2 && this.cameraVideo.videoWidth > 0);
 
-					// Start appropriate rendering method
-					if (this.isPageVisible) {
-						this.renderFrame();
-					} else {
-						console.log("VideoComposer: Starting in background mode");
-						this.switchToTimer();
-					}
+			if (screenReady && cameraReady) {
+				// Ajustar canvas para corresponder ao aspect ratio do vídeo
+				this.adjustCanvasToVideoAspectRatio();
+
+				// Se temos câmera, aguardar um pouco mais para garantir que as dimensões estejam corretas
+				if (this.cameraVideo) {
+					console.log("🎥 Câmera detectada, aguardando dimensões estáveis...");
+					setTimeout(() => {
+						this.recalculateCameraSettings();
+						startRendering();
+					}, 100);
 				} else {
-					requestAnimationFrame(waitForVideos);
+					startRendering();
 				}
 			} else {
 				requestAnimationFrame(waitForVideos);
+			}
+		};
+
+		// Método auxiliar para iniciar renderização
+		const startRendering = () => {
+			if (this.isPageVisible) {
+				this.renderFrame();
+			} else {
+				console.log("VideoComposer: Starting in background mode");
+				this.switchToTimer();
 			}
 		};
 
@@ -462,6 +582,19 @@ export class VideoComposer {
 				this.cameraVideo.autoplay = true;
 				this.cameraVideo.muted = true;
 				this.cameraVideo.playsInline = true;
+
+				// Aguardar metadados da câmera para garantir aspect ratio correto
+				this.cameraVideo.addEventListener("loadedmetadata", () => {
+					console.log("🎥 Câmera atualizada com dimensões:", {
+						width: this.cameraVideo?.videoWidth,
+						height: this.cameraVideo?.videoHeight,
+						aspectRatio: this.cameraVideo
+							? (
+									this.cameraVideo.videoWidth / this.cameraVideo.videoHeight
+								).toFixed(3)
+							: "N/A",
+					});
+				});
 			}
 			this.cameraVideo.srcObject = cameraStream;
 			this.options.cameraStream = cameraStream;
@@ -503,6 +636,20 @@ export class VideoComposer {
 		console.log("Atualizando configurações da câmera", { position, size });
 		this.options.cameraPosition = position;
 		this.options.cameraSize = size;
+
+		// Forçar recálculo das configurações na próxima renderização
+		this.dimensionsLogged = false;
+	}
+
+	// Forçar recálculo das configurações da câmera
+	public recalculateCameraSettings(): void {
+		console.log("🔄 Forçando recálculo das configurações da câmera");
+		this.dimensionsLogged = false;
+
+		// Se estiver renderizando, forçar um frame para atualizar
+		if (this.isComposing) {
+			this.renderFrameContent();
+		}
 	}
 
 	// Obter stream composto
