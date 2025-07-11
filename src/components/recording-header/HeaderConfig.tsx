@@ -168,7 +168,7 @@ export function HeaderConfig() {
 										Sexo
 									</Label>
 									<Select
-										value={headerConfig.patientSex}
+										value={headerConfig.patientSex || undefined}
 										onValueChange={(value) =>
 											handleInputChange("patientSex", value)
 										}

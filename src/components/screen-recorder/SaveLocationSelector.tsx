@@ -120,22 +120,25 @@ export function SaveLocationSelector({
 		);
 	}
 
-	const defaultLocationsData =
-		(defaultLocations && [
-			...Object.entries(defaultLocations).map(([key, path]) => ({
-				value: path,
-				label: `${getLocationLabel(key).label} - ${path}`,
-				icon: getLocationLabel(key).icon,
-			})),
-			{
-				value: customLocation || "",
-				label:
-					"Local personalizado - " +
-					(customLocation || "Sem local selecionado"),
-				icon: <Folder className="h-5 w-5" />,
-			},
-		]) ||
-		[];
+	const defaultLocationsData = defaultLocations
+		? [
+				...Object.entries(defaultLocations).map(([key, path]) => ({
+					value: path,
+					label: `${getLocationLabel(key).label} - ${path}`,
+					icon: getLocationLabel(key).icon,
+				})),
+				// Só adiciona o local personalizado se houver um valor válido
+				...(customLocation
+					? [
+							{
+								value: customLocation,
+								label: `Local personalizado - ${customLocation}`,
+								icon: <Folder className="h-5 w-5" />,
+							},
+						]
+					: []),
+			]
+		: [];
 
 	return (
 		<Card>
@@ -148,7 +151,7 @@ export function SaveLocationSelector({
 			<CardContent className="overflow-y-auto max-h-[calc(100vh-450px)]">
 				<h4 className="text-sm font-medium">Locais recomendados</h4>
 				<Select
-					value={selectedLocation || ""}
+					value={selectedLocation || undefined}
 					onValueChange={handleLocationSelect}
 				>
 					<SelectTrigger>

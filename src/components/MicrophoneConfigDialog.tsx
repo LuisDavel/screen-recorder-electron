@@ -226,18 +226,23 @@ export function MicrophoneConfigDialog({
 					<div className="grid gap-2">
 						<Label>Dispositivo</Label>
 						<Select
-							value={selectedDeviceId || ""}
+							value={selectedDeviceId || undefined}
 							onValueChange={setSelectedDeviceId}
 						>
 							<SelectTrigger>
 								<SelectValue placeholder="Selecione um microfone" />
 							</SelectTrigger>
 							<SelectContent>
-								{devices?.map((device) => (
-									<SelectItem key={device.deviceId} value={device.deviceId}>
-										{device.label}
-									</SelectItem>
-								))}
+								{devices
+									?.filter(
+										(device) =>
+											device.deviceId && device.deviceId.trim() !== "",
+									)
+									?.map((device) => (
+										<SelectItem key={device.deviceId} value={device.deviceId}>
+											{device.label}
+										</SelectItem>
+									))}
 							</SelectContent>
 						</Select>
 					</div>

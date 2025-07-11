@@ -251,7 +251,7 @@ export function ScreenPreview() {
 					</label>
 					<div className="flex items-center gap-3">
 						<Select
-							value={selectedSourceId || ""}
+							value={selectedSourceId || undefined}
 							onValueChange={handleSourceChange}
 						>
 							<SelectTrigger className="w-full">
@@ -259,15 +259,17 @@ export function ScreenPreview() {
 							</SelectTrigger>
 							<SelectContent>
 								{sources &&
-									sources.map((source) => (
-										<SelectItem
-											className="overflow-hidden text-left text-ellipsis"
-											key={source.id}
-											value={source.id}
-										>
-											{source.name}
-										</SelectItem>
-									))}
+									sources
+										.filter((source) => source.id && source.id.trim() !== "")
+										.map((source) => (
+											<SelectItem
+												className="overflow-hidden text-left text-ellipsis"
+												key={source.id}
+												value={source.id}
+											>
+												{source.name}
+											</SelectItem>
+										))}
 							</SelectContent>
 						</Select>
 						<button
