@@ -6,6 +6,7 @@ import {
 } from "./video-composer";
 import { useCameraConfigStore } from "@/store/store-camera-config";
 import { useMicrophoneConfigStore } from "@/store/store-microphone-config";
+import { useVideoFormatStore } from "@/store/store-video-format";
 import { saveRecording, saveToLocation } from "./screen_recorder_helpers";
 import { recordingMonitor } from "./recording-monitor";
 import { VideoHeaderComposer } from "./video-header-composer";
@@ -429,6 +430,30 @@ export class AdvancedScreenRecorderManager {
 
 	// Obter codecs suportados
 	private getSupportedMimeType(): string {
+		const videoFormatState = useVideoFormatStore.getState();
+		const desiredMimeType = videoFormatState.getMimeType();
+
+		console.log("🔍 DEBUG: Verificando suporte de formato:", {
+			formatoSelecionado: videoFormatState.format,
+			codecSelecionado: videoFormatState.codec,
+			mimeTypeDesejado: desiredMimeType,
+		});
+
+		// Try the user-selected format first
+		const isSupported = MediaRecorder.isTypeSupported(desiredMimeType);
+		console.log("🔍 DEBUG: Suporte do formato selecionado:", {
+			mimeType: desiredMimeType,
+			suportado: isSupported,
+		});
+
+		if (isSupported) {
+			console.log("✅ Codec selecionado pelo usuário:", desiredMimeType);
+			return desiredMimeType;
+		}
+
+		console.warn("⚠️ Formato selecionado não suportado, tentando fallback");
+
+		// Fallback to supported types
 		const supportedTypes = [
 			"video/webm; codecs=vp9",
 			"video/webm; codecs=vp8",
@@ -438,8 +463,14 @@ export class AdvancedScreenRecorderManager {
 		];
 
 		for (const type of supportedTypes) {
-			if (MediaRecorder.isTypeSupported(type)) {
-				console.log("Codec selecionado:", type);
+			const supported = MediaRecorder.isTypeSupported(type);
+			console.log("🔍 DEBUG: Testando fallback:", {
+				mimeType: type,
+				suportado: supported,
+			});
+
+			if (supported) {
+				console.log("✅ Codec fallback selecionado:", type);
 				return type;
 			}
 		}
@@ -593,9 +624,28 @@ export class AdvancedScreenRecorderManager {
 				),
 			});
 
-			// Criar blob final
-			const blob = new Blob(this.recordedChunks, { type: "video/webm" });
-			console.log("Blob criado", { size: blob.size });
+			// Criar blob final usando o formato selecionado
+			const videoFormatState = useVideoFormatStore.getState();
+			const mimeType = videoFormatState.getMimeType();
+			const selectedFormat = videoFormatState.format;
+
+			console.log("🔍 DEBUG: Criando blob com formato:", {
+				formatoSelecionado: selectedFormat,
+				mimeType: mimeType,
+				chunksCount: this.recordedChunks.length,
+				totalSize: this.recordedChunks.reduce(
+					(sum, chunk) => sum + chunk.size,
+					0,
+				),
+			});
+
+			const blob = new Blob(this.recordedChunks, { type: mimeType });
+			console.log("✅ Blob criado:", {
+				size: blob.size,
+				type: blob.type,
+				mimeType: mimeType,
+				formatoOriginal: selectedFormat,
+			});
 
 			// Converter para buffer
 			const buffer = await blob.arrayBuffer();
@@ -604,12 +654,29 @@ export class AdvancedScreenRecorderManager {
 
 			// Salvar vídeo
 			let result;
+			const format = useVideoFormatStore.getState().format;
+
+			console.log("🔍 DEBUG: Salvando vídeo:", {
+				formato: format,
+				tamanhoBuffer: videoBuffer.length,
+				localEspecifico: this.options?.saveLocation,
+			});
+
 			if (this.options?.saveLocation) {
-				console.log("Salvando em local específico:", this.options.saveLocation);
-				result = await saveToLocation(videoBuffer, this.options.saveLocation);
+				console.log(
+					"📁 Salvando em local específico:",
+					this.options.saveLocation,
+					"formato:",
+					format,
+				);
+				result = await saveToLocation(
+					videoBuffer,
+					this.options.saveLocation,
+					format,
+				);
 			} else {
-				console.log("Salvando com seletor de arquivo");
-				result = await saveRecording(videoBuffer);
+				console.log("📁 Salvando com seletor de arquivo, formato:", format);
+				result = await saveRecording(videoBuffer, format);
 			}
 
 			console.log("Resultado do salvamento:", result);

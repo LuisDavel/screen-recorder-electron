@@ -23,8 +23,9 @@ export async function stopRecording(): Promise<{
 // Salvar gravação
 export async function saveRecording(
 	videoBuffer: Buffer,
+	format?: string,
 ): Promise<{ success: boolean; message: string; filePath?: string }> {
-	return await window.screenRecorder.saveRecording(videoBuffer);
+	return await window.screenRecorder.saveRecording(videoBuffer, format);
 }
 
 // Obter status da gravação
@@ -72,13 +73,18 @@ export async function chooseSaveLocation(): Promise<{
 export async function saveToLocation(
 	videoBuffer: Buffer,
 	saveLocation: string,
+	format?: string,
 ): Promise<{
 	success: boolean;
 	message: string;
 	filePath?: string;
 	fileName?: string;
 }> {
-	return await window.screenRecorder.saveToLocation(videoBuffer, saveLocation);
+	return await window.screenRecorder.saveToLocation(
+		videoBuffer,
+		saveLocation,
+		format,
+	);
 }
 
 // Classe para gerenciar o MediaRecorder

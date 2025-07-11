@@ -26,7 +26,7 @@ function createWindow() {
 	const preload = path.join(__dirname, "preload.js");
 	mainWindow = new BrowserWindow({
 		width: 1200,
-		height: 800,
+		height: 900,
 		webPreferences: {
 			devTools: inDevelopment,
 			contextIsolation: true,
@@ -212,7 +212,9 @@ if (!gotTheLock) {
 		}
 	});
 
-	const firstUrl = process.argv.find((arg) => arg.startsWith("videorecorder://"));
+	const firstUrl = process.argv.find((arg) =>
+		arg.startsWith("videorecorder://"),
+	);
 	if (firstUrl) {
 		deepLinkUrl = firstUrl;
 	}

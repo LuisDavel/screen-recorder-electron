@@ -85,14 +85,16 @@ export function addScreenRecorderEventListeners(mainWindow: BrowserWindow) {
 	// Salvar gravação
 	ipcMain.handle(
 		SCREEN_RECORDER_SAVE_CHANNEL,
-		async (event, videoBuffer: Buffer) => {
+		async (event, videoBuffer: Buffer, format: string = "webm") => {
 			try {
 				console.log("Salvando vídeo - tamanho do buffer:", videoBuffer.length);
+				console.log("Formato solicitado:", format);
 
+				const extension = format === "mp4" ? "mp4" : "webm";
 				const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
 					defaultPath: join(
 						app.getPath("videos"),
-						`screen-recording-${Date.now()}.webm`,
+						`screen-recording-${Date.now()}.${extension}`,
 					),
 					filters: [
 						{ name: "Video Files", extensions: ["webm", "mp4"] },
@@ -168,13 +170,20 @@ export function addScreenRecorderEventListeners(mainWindow: BrowserWindow) {
 	// Salvar vídeo em local específico
 	ipcMain.handle(
 		SCREEN_RECORDER_SAVE_TO_LOCATION_CHANNEL,
-		async (event, videoBuffer: Buffer, saveLocation: string) => {
+		async (
+			event,
+			videoBuffer: Buffer,
+			saveLocation: string,
+			format: string = "webm",
+		) => {
 			try {
 				console.log("Salvando vídeo em local específico:", saveLocation);
 				console.log("Tamanho do buffer:", videoBuffer.length);
+				console.log("Formato solicitado:", format);
 
 				const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-				const fileName = `screen-recording-${timestamp}.webm`;
+				const extension = format === "mp4" ? "mp4" : "webm";
+				const fileName = `screen-recording-${timestamp}.${extension}`;
 				const filePath = join(saveLocation, fileName);
 
 				console.log("Caminho completo:", filePath);

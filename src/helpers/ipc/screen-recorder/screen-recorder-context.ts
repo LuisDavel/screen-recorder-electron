@@ -24,8 +24,8 @@ export function exposeScreenRecorderContext() {
 		stopRecording: () => ipcRenderer.invoke(SCREEN_RECORDER_STOP_CHANNEL),
 
 		// Salvar gravação
-		saveRecording: (videoBuffer: Buffer) =>
-			ipcRenderer.invoke(SCREEN_RECORDER_SAVE_CHANNEL, videoBuffer),
+		saveRecording: (videoBuffer: Buffer, format?: string) =>
+			ipcRenderer.invoke(SCREEN_RECORDER_SAVE_CHANNEL, videoBuffer, format),
 
 		// Obter status da gravação
 		getStatus: () => ipcRenderer.invoke(SCREEN_RECORDER_GET_STATUS_CHANNEL),
@@ -39,11 +39,16 @@ export function exposeScreenRecorderContext() {
 			ipcRenderer.invoke(SCREEN_RECORDER_CHOOSE_SAVE_LOCATION_CHANNEL),
 
 		// Salvar vídeo em local específico
-		saveToLocation: (videoBuffer: Buffer, saveLocation: string) =>
+		saveToLocation: (
+			videoBuffer: Buffer,
+			saveLocation: string,
+			format?: string,
+		) =>
 			ipcRenderer.invoke(
 				SCREEN_RECORDER_SAVE_TO_LOCATION_CHANNEL,
 				videoBuffer,
 				saveLocation,
+				format,
 			),
 
 		// Enviar chunk de vídeo

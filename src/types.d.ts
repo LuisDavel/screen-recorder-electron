@@ -35,6 +35,7 @@ interface ScreenRecorderContext {
 	stopRecording: () => Promise<{ success: boolean; message: string }>;
 	saveRecording: (
 		videoBuffer: Buffer,
+		format?: string,
 	) => Promise<{ success: boolean; message: string; filePath?: string }>;
 	getStatus: () => Promise<{ isRecording: boolean; recordedChunks: number }>;
 	getDefaultLocations: () => Promise<DefaultSaveLocations>;
@@ -46,6 +47,7 @@ interface ScreenRecorderContext {
 	saveToLocation: (
 		videoBuffer: Buffer,
 		saveLocation: string,
+		format?: string,
 	) => Promise<{
 		success: boolean;
 		message: string;
