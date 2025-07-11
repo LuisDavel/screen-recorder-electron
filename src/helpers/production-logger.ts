@@ -8,18 +8,24 @@ export class ProductionLogger {
 
 	static initialize() {
 		try {
-			// Criar diretório de logs no diretório de dados do usuário
-			this.logDir = join(app.getPath("userData"), "logs");
-			if (!existsSync(this.logDir)) {
-				mkdirSync(this.logDir, { recursive: true });
+			// Só criar diretório de logs em desenvolvimento
+			if (process.env.NODE_ENV === "development") {
+				this.logDir = join(app.getPath("userData"), "logs");
+				if (!existsSync(this.logDir)) {
+					mkdirSync(this.logDir, { recursive: true });
+				}
+
+				// Arquivo de log com timestamp
+				const timestamp = new Date().toISOString().split("T")[0];
+				this.logFile = join(this.logDir, `permissions-${timestamp}.log`);
+
+				this.log("INFO", "Production logger initialized");
+				this.log("INFO", `Log file: ${this.logFile}`);
+			} else {
+				console.log(
+					"Production logger disabled in production to save resources",
+				);
 			}
-
-			// Arquivo de log com timestamp
-			const timestamp = new Date().toISOString().split("T")[0];
-			this.logFile = join(this.logDir, `permissions-${timestamp}.log`);
-
-			this.log("INFO", "Production logger initialized");
-			this.log("INFO", `Log file: ${this.logFile}`);
 		} catch (error) {
 			console.error("Failed to initialize production logger:", error);
 		}
@@ -31,17 +37,19 @@ export class ProductionLogger {
 		data?: Record<string, unknown> | string | boolean,
 	) {
 		try {
-			const timestamp = new Date().toISOString();
-			const logLine = `${timestamp} [${level}] ${message}${data ? ` | Data: ${JSON.stringify(data)}` : ""}\n`;
-
-			// Sempre tentar escrever no arquivo
-			if (this.logFile) {
-				writeFileSync(this.logFile, logLine, { flag: "a" });
-			}
-
-			// Em desenvolvimento, também mostrar no console
+			// Reduzir escrita para economizar recursos - só em desenvolvimento
 			if (process.env.NODE_ENV === "development") {
 				console.log(`[PROD-LOG] ${level}: ${message}`, data || "");
+			}
+
+			// Só gravar logs críticos em produção
+			if (level === "ERROR") {
+				const timestamp = new Date().toISOString();
+				const logLine = `${timestamp} [${level}] ${message}${data ? ` | Data: ${JSON.stringify(data)}` : ""}\n`;
+
+				if (this.logFile) {
+					writeFileSync(this.logFile, logLine, { flag: "a" });
+				}
 			}
 		} catch (error) {
 			console.error("Failed to write log:", error);
@@ -53,33 +61,25 @@ export class ProductionLogger {
 		microphone: boolean;
 		screenCapture: boolean;
 	}) {
-		this.log("INFO", "Permission Status Check", permissions);
-
-		// Log individual permissions
-		if (permissions.camera) {
-			this.log("INFO", "Camera permission: GRANTED");
-		} else {
-			this.log("WARN", "Camera permission: DENIED or NOT REQUESTED");
+		// Reduzir logging para economizar recursos
+		if (process.env.NODE_ENV === "development") {
+			this.log("INFO", "Permission Status Check", permissions);
 		}
 
-		if (permissions.microphone) {
-			this.log("INFO", "Microphone permission: GRANTED");
-		} else {
-			this.log("WARN", "Microphone permission: DENIED or NOT REQUESTED");
-		}
-
-		if (permissions.screenCapture) {
-			this.log("INFO", "Screen capture permission: GRANTED");
-		} else {
-			this.log("WARN", "Screen capture permission: DENIED or NOT REQUESTED");
-		}
-
+		// Só logar se alguma permissão estiver faltando
 		const allGranted =
 			permissions.camera && permissions.microphone && permissions.screenCapture;
-		this.log(
-			allGranted ? "INFO" : "WARN",
-			`All permissions status: ${allGranted ? "ALL GRANTED" : "SOME MISSING"}`,
-		);
+
+		if (!allGranted) {
+			this.log(
+				"WARN",
+				`Missing permissions: ${
+					!permissions.camera ? "Camera " : ""
+				}${!permissions.microphone ? "Microphone " : ""}${
+					!permissions.screenCapture ? "ScreenCapture " : ""
+				}`.trim(),
+			);
+		}
 	}
 
 	static logPermissionRequest(
@@ -101,6 +101,11 @@ export class ProductionLogger {
 		this.log("INFO", `Chrome version: ${process.versions.chrome}`);
 	}
 
+	static logAppQuit() {
+		this.log("INFO", "Application quit requested");
+		this.log("INFO", "Cleaning up resources...");
+	}
+
 	static logError(error: Error, context?: string) {
 		this.log("ERROR", `${context ? `${context}: ` : ""}${error.message}`, {
 			stack: error.stack,
@@ -117,14 +122,17 @@ export class ProductionLogger {
 	}
 
 	static logSystemInfo() {
-		this.log("INFO", "System information", {
-			platform: process.platform,
-			arch: process.arch,
-			nodeVersion: process.versions.node,
-			electronVersion: process.versions.electron,
-			chromeVersion: process.versions.chrome,
-			isPackaged: app.isPackaged,
-		});
+		// Só logar informações do sistema em desenvolvimento
+		if (process.env.NODE_ENV === "development") {
+			this.log("INFO", "System information", {
+				platform: process.platform,
+				arch: process.arch,
+				nodeVersion: process.versions.node,
+				electronVersion: process.versions.electron,
+				chromeVersion: process.versions.chrome,
+				isPackaged: app.isPackaged,
+			});
+		}
 	}
 
 	static logPermissionDiagnostic(diagnostic: {

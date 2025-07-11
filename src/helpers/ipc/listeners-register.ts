@@ -57,8 +57,12 @@ export default function registerListeners(mainWindow: BrowserWindow) {
 		addPlatformEventListeners();
 		addScreenRecorderEventListeners(mainWindow);
 		addPermissionsEventListeners();
-		registerProductionLogsListeners();
-		registerDiagnosticListeners();
+
+		// Registrar logs e diagnósticos apenas em desenvolvimento
+		if (process.env.NODE_ENV === "development") {
+			registerProductionLogsListeners();
+			registerDiagnosticListeners();
+		}
 
 		listenersRegistered = true;
 		console.log("IPC listeners registrados com sucesso");

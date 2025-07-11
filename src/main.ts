@@ -137,9 +137,11 @@ app
 	.whenReady()
 	.then(() => {
 		console.log("App está pronto, inicializando...");
-		// Initialize production logger
-		ProductionLogger.initialize();
-		ProductionLogger.logAppStart();
+		// Initialize production logger apenas em desenvolvimento
+		if (process.env.NODE_ENV === "development") {
+			ProductionLogger.initialize();
+			ProductionLogger.logAppStart();
+		}
 
 		return createWindow();
 	})

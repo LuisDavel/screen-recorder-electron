@@ -84,12 +84,12 @@ export class AdvancedScreenRecorderManager {
 					mandatory: {
 						chromeMediaSource: "desktop",
 						chromeMediaSourceId: sourceId,
-						// Manter resolução original da tela
-						maxWidth: 4096,
-						maxHeight: 4096,
-						// Garantir qualidade máxima
-						minFrameRate: 30,
-						maxFrameRate: 60,
+						// Reduzir resolução máxima para melhor performance
+						maxWidth: 1920,
+						maxHeight: 1080,
+						// Configurar frame rate mais conservador para Windows
+						minFrameRate: 15,
+						maxFrameRate: 30,
 					},
 				} as any,
 			});
@@ -101,7 +101,7 @@ export class AdvancedScreenRecorderManager {
 			// Detectar se é captura de tela completa (sem foco de aplicação)
 			const isFullScreenCapture =
 				sourceId.includes("screen:") ||
-				(settings.width && settings.height && settings.width > 2000);
+				(settings.width && settings.height && settings.width > 1600);
 
 			console.log("Stream da tela obtido com sucesso", {
 				sourceId,
@@ -123,7 +123,7 @@ export class AdvancedScreenRecorderManager {
 			// Se for captura de tela completa e detectarmos aspect ratio incorreto, alertar
 			if (isFullScreenCapture && settings.width && settings.height) {
 				const aspectRatio = settings.width / settings.height;
-				if (aspectRatio < 2.0 && settings.width > 2000) {
+				if (aspectRatio < 2.0 && settings.width > 1600) {
 					console.warn(
 						"⚠️ DETECÇÃO: Possível problema com captura de tela ultrawide",
 						{
@@ -247,15 +247,29 @@ export class AdvancedScreenRecorderManager {
 				});
 
 				// Criar compositor com dimensões específicas se fornecidas nas opções
+				// Otimizar para Windows: reduzir resolução se muito alta
+				const maxWidth = Math.min(screenWidth, 1920);
+				const maxHeight = Math.min(screenHeight, 1080);
+				const aspectRatio = screenWidth / screenHeight;
+
+				// Manter proporção se reduzir a resolução
+				let finalWidth = options.outputWidth || maxWidth;
+				let finalHeight = options.outputHeight || maxHeight;
+
+				if (finalWidth > 1920) {
+					finalWidth = 1920;
+					finalHeight = Math.round(finalWidth / aspectRatio);
+				}
+
 				const composerOptions = {
 					screenStream: currentStream,
 					cameraStream: cameraStream,
 					cameraPosition: cameraStore.position as CameraPositionType,
 					cameraSize: cameraStore.size as CameraSizeType,
 					audioStream: undefined, // Audio will be added later
-					outputWidth: options.outputWidth || screenWidth,
-					outputHeight: options.outputHeight || screenHeight,
-					frameRate: options.frameRate || 30,
+					outputWidth: finalWidth,
+					outputHeight: finalHeight,
+					frameRate: Math.min(options.frameRate || 25, 30), // Limitar frame rate
 				};
 
 				this.videoComposer = new VideoComposer(composerOptions);
@@ -490,6 +504,31 @@ export class AdvancedScreenRecorderManager {
 		this.options = options;
 
 		try {
+			// Detectar plataforma e aplicar otimizações específicas
+			const isWindows =
+				typeof navigator !== "undefined" &&
+				navigator.platform.toLowerCase().includes("win");
+
+			if (isWindows) {
+				console.log(
+					"🪟 Windows detectado - aplicando otimizações de performance",
+				);
+
+				// Otimizações específicas para Windows
+				if (!options.videoBitrate) {
+					options.videoBitrate = 1200000; // 1.2 Mbps mais conservador
+				}
+
+				if (!options.frameRate) {
+					options.frameRate = 20; // Frame rate mais baixo para Windows
+				}
+
+				console.log("🎯 Configurações otimizadas para Windows:", {
+					bitrate: options.videoBitrate,
+					frameRate: options.frameRate,
+				});
+			}
+
 			// Aplicar otimizações do WhatsApp se necessário
 			const videoFormatState = useVideoFormatStore.getState();
 			if (videoFormatState.format === "whatsapp") {
@@ -534,11 +573,16 @@ export class AdvancedScreenRecorderManager {
 				mimeType,
 			};
 
-			// Adicionar bitrate se especificado (incluindo otimizações do WhatsApp)
-			if (options.videoBitrate) {
-				recordingOptions.videoBitsPerSecond = options.videoBitrate;
-				console.log("🎯 Bitrate configurado:", options.videoBitrate);
+			// Otimizar bitrate para Windows - usar valor mais baixo por padrão
+			let finalBitrate = options.videoBitrate;
+			if (!finalBitrate) {
+				// Bitrate mais conservador para Windows
+				finalBitrate = 1500000; // 1.5 Mbps ao invés de 2.5 Mbps
+				console.log("🎯 Usando bitrate otimizado para Windows:", finalBitrate);
 			}
+
+			recordingOptions.videoBitsPerSecond = finalBitrate;
+			console.log("🎯 Bitrate configurado:", finalBitrate);
 
 			this.mediaRecorder = new MediaRecorder(
 				this.finalStream,
@@ -567,22 +611,24 @@ export class AdvancedScreenRecorderManager {
 			// Configurar event listeners
 			this.setupRecorderListeners();
 
-			// Iniciar gravação
-			this.mediaRecorder.start(1000); // Chunk a cada segundo
+			// Iniciar gravação com chunks maiores para melhor performance
+			this.mediaRecorder.start(5000); // Chunk a cada 5 segundos (otimizado para Windows)
 			this.isRecording = true;
 			this.recordedChunks = [];
 
-			// Notify recording monitor using direct instance access
-			recordingMonitor.onSessionStart({
-				id: `advanced-recorder-${Date.now()}`,
-				startTime: new Date(),
-				isActive: true,
-				hasCamera: !!this.cameraStream,
-				hasMicrophone: !!this.audioStream,
-				isPaused: false,
-				windowHidden: false,
-				backgroundOptimized: false,
-			});
+			// Notify recording monitor usando direct instance access (apenas em desenvolvimento)
+			if (process.env.NODE_ENV === "development") {
+				recordingMonitor.onSessionStart({
+					id: `advanced-recorder-${Date.now()}`,
+					startTime: new Date(),
+					isActive: true,
+					hasCamera: !!this.cameraStream,
+					hasMicrophone: !!this.audioStream,
+					isPaused: false,
+					windowHidden: false,
+					backgroundOptimized: false,
+				});
+			}
 
 			console.log("Gravação iniciada com sucesso");
 		} catch (error) {
@@ -599,10 +645,31 @@ export class AdvancedScreenRecorderManager {
 		this.mediaRecorder.ondataavailable = (event) => {
 			if (event.data.size > 0) {
 				this.recordedChunks.push(event.data);
+
+				// Monitorar performance para detectar problemas
+				const totalSize = this.recordedChunks.reduce(
+					(sum, chunk) => sum + chunk.size,
+					0,
+				);
+				const avgChunkSize = totalSize / this.recordedChunks.length;
+
 				console.log("Chunk gravado", {
 					size: event.data.size,
 					totalChunks: this.recordedChunks.length,
+					totalSize: totalSize,
+					avgChunkSize: Math.round(avgChunkSize),
 				});
+
+				// Alertar se chunks estão muito pequenos (possível problema de performance)
+				if (event.data.size < 50000 && this.recordedChunks.length > 3) {
+					console.warn(
+						"⚠️ Chunk muito pequeno detectado - possível problema de performance",
+						{
+							chunkSize: event.data.size,
+							recomendação: "Considere reduzir qualidade ou frame rate",
+						},
+					);
+				}
 			}
 		};
 
@@ -742,8 +809,10 @@ export class AdvancedScreenRecorderManager {
 
 			this.isRecording = false;
 
-			// Notify recording monitor using direct instance access
-			recordingMonitor.onSessionStop(`advanced-recorder-${Date.now()}`);
+			// Notify recording monitor usando direct instance access (apenas em desenvolvimento)
+			if (process.env.NODE_ENV === "development") {
+				recordingMonitor.onSessionStop(`advanced-recorder-${Date.now()}`);
+			}
 
 			// Aguardar processamento
 			await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -920,11 +989,11 @@ export class AdvancedScreenRecorderManager {
 			headerConfig: undefined,
 			includeFooter: false,
 			footerConfig: undefined,
-			// Remover configurações fixas de resolução - será detectado automaticamente
-			outputWidth: undefined,
-			outputHeight: undefined,
-			frameRate: 30,
-			videoBitrate: 2500000, // 2.5 Mbps
+			// Configurações otimizadas para Windows
+			outputWidth: undefined, // Será detectado automaticamente
+			outputHeight: undefined, // Será detectado automaticamente
+			frameRate: 25, // Reduzido para melhor performance
+			videoBitrate: 1500000, // 1.5 Mbps - mais leve para Windows
 		};
 	}
 }
