@@ -326,11 +326,9 @@ export class AdvancedScreenRecorderManager {
 		}
 
 		// Apply footer if needed
-		console.log("🔍 DEBUG: Verificando se deve aplicar footer:", {
+		console.log("Verificando se deve aplicar footer:", {
 			includeFooter: options.includeFooter,
 			footerEnabled: options.footerConfig?.isEnabled,
-			footerConfig: options.footerConfig,
-			hasFooterComposer: !!this.footerComposer,
 		});
 
 		if (options.includeFooter && options.footerConfig?.isEnabled) {
@@ -384,12 +382,7 @@ export class AdvancedScreenRecorderManager {
 					height,
 				);
 
-				console.log("🔍 DEBUG: Footer aplicado com sucesso, novo stream:", {
-					streamId: currentStream.id,
-					videoTracks: currentStream.getVideoTracks().length,
-					audioTracks: currentStream.getAudioTracks().length,
-					videoTrackSettings: currentStream.getVideoTracks()[0]?.getSettings(),
-				});
+				console.log("Footer aplicado com sucesso, novo stream:", currentStream);
 			} catch (error) {
 				console.error("Erro ao aplicar footer:", error);
 			}

@@ -42,7 +42,7 @@ export class VideoHeaderComposer {
 			audioTracks: sourceStream.getAudioTracks().length,
 		});
 
-		// Set canvas dimensions
+		// Set canvas dimensions to match original video (header will overlay)
 		this.canvas.width = width;
 		this.canvas.height = height;
 
@@ -84,8 +84,8 @@ export class VideoHeaderComposer {
 			},
 		});
 
-		// Ajustar canvas para corresponder ao aspect ratio do vídeo
-		this.adjustCanvasToVideoAspectRatio();
+		// Canvas mantém dimensões originais - header sobrepõe o vídeo
+		// this.adjustCanvasToVideoAspectRatio();
 
 		// Start composition loop
 		this.startComposition();
@@ -206,60 +206,20 @@ export class VideoHeaderComposer {
 					this.dimensionsLogged = true;
 				}
 
-				// Desenhar vídeo FORÇANDO preenchimento total (crop/fill para eliminar achatamento)
-				// Calcular dimensões para preencher completamente o canvas
-				const canvasAspectRatio = this.canvas.width / this.canvas.height;
-				const videoAspectRatio = videoWidth / videoHeight;
-
-				let srcX = 0,
-					srcY = 0,
-					srcWidth = videoWidth,
-					srcHeight = videoHeight;
-
-				// Se o vídeo tem aspect ratio diferente, fazer crop para preencher
-				if (Math.abs(canvasAspectRatio - videoAspectRatio) > 0.01) {
-					console.log(
-						"🔧 HeaderComposer: Aplicando crop/fill para corrigir aspect ratio:",
-						{
-							canvas: `${this.canvas.width}x${this.canvas.height} (${canvasAspectRatio.toFixed(3)})`,
-							video: `${videoWidth}x${videoHeight} (${videoAspectRatio.toFixed(3)})`,
-						},
-					);
-
-					if (canvasAspectRatio > videoAspectRatio) {
-						// Canvas mais largo - cortar altura do vídeo
-						const targetHeight = videoWidth / canvasAspectRatio;
-						srcY = (videoHeight - targetHeight) / 2;
-						srcHeight = targetHeight;
-						console.log("📐 HeaderComposer: Cortando altura do vídeo:", {
-							srcY,
-							srcHeight,
-						});
-					} else {
-						// Canvas mais alto - cortar largura do vídeo
-						const targetWidth = videoHeight * canvasAspectRatio;
-						srcX = (videoWidth - targetWidth) / 2;
-						srcWidth = targetWidth;
-						console.log("📐 HeaderComposer: Cortando largura do vídeo:", {
-							srcX,
-							srcWidth,
-						});
-					}
-				}
-
+				// Draw original video at full size (header will overlay on top)
 				this.ctx.drawImage(
 					this.video,
-					srcX,
-					srcY, // source x, y (com crop)
-					srcWidth,
-					srcHeight, // source width, height (com crop)
+					0,
+					0, // source x, y
+					this.video.videoWidth || this.canvas.width, // source width
+					this.video.videoHeight || this.canvas.height, // source height
 					0,
 					0, // destination x, y
-					this.canvas.width, // destination width
-					this.canvas.height, // destination height
+					this.canvas.width, // destination width (full canvas width)
+					this.canvas.height, // destination height (full canvas height)
 				);
 
-				// Desenhar header sobreposto no topo
+				// Draw header overlay at the top
 				this.drawHeader();
 			}
 
@@ -272,13 +232,7 @@ export class VideoHeaderComposer {
 	private drawHeader() {
 		const headerHeight = this.headerConfig.height;
 
-		console.log("VideoHeaderComposer: Desenhando header", {
-			headerHeight,
-			canvasWidth: this.canvas.width,
-			examName: this.headerConfig.examName,
-		});
-
-		// Draw header background at top
+		// Draw header overlay background at top
 		this.ctx.fillStyle = "rgba(17, 24, 39, 0.95)"; // gray-900 with opacity
 		this.ctx.fillRect(0, 0, this.canvas.width, headerHeight);
 

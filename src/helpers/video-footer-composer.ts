@@ -48,69 +48,27 @@ export class VideoFooterComposer {
 			return inputStream;
 		}
 
-		const footerHeight = this.config.height;
-		const totalHeight = height + footerHeight;
-
-		// Set canvas dimensions
+		// Set canvas dimensions to match original video (footer will overlay)
 		this.canvas.width = width;
-		this.canvas.height = totalHeight;
+		this.canvas.height = height;
 
 		console.log("VideoFooterComposer: Canvas configurado", {
 			canvasWidth: this.canvas.width,
 			canvasHeight: this.canvas.height,
-			originalHeight: height,
-			footerHeight,
-			totalHeight,
+			footerHeight: this.config.height,
+			mode: "overlay",
 		});
 
 		// Set video source
 		this.video.srcObject = inputStream;
 
-		// Wait for video to be ready with proper error handling
-		console.log("🔍 DEBUG: Configurando vídeo source para footer");
-		await new Promise<void>((resolve, reject) => {
-			const timeout = setTimeout(() => {
-				reject(new Error("Timeout aguardando vídeo ficar pronto"));
-			}, 5000);
+		await this.video.play();
 
-			const onLoadedMetadata = () => {
-				console.log("🔍 DEBUG: Metadados do vídeo carregados");
-				clearTimeout(timeout);
-				this.video.removeEventListener("loadedmetadata", onLoadedMetadata);
-				this.video.removeEventListener("error", onError);
-				resolve();
-			};
-
-			const onError = (error: Event) => {
-				console.error("🔍 DEBUG: Erro no vídeo:", error);
-				clearTimeout(timeout);
-				this.video.removeEventListener("loadedmetadata", onLoadedMetadata);
-				this.video.removeEventListener("error", onError);
-				reject(error);
-			};
-
-			this.video.addEventListener("loadedmetadata", onLoadedMetadata);
-			this.video.addEventListener("error", onError);
-
-			// Try to play the video
-			this.video.play().catch((error) => {
-				console.warn("🔍 DEBUG: Aviso ao reproduzir vídeo:", error);
-				// Don't reject here, as autoplay issues are common but don't prevent processing
-			});
-		});
-
-		// Additional check for video dimensions
+		// Wait for video metadata to load to get accurate dimensions
 		if (this.video.videoWidth === 0 || this.video.videoHeight === 0) {
-			console.log("🔍 DEBUG: Aguardando dimensões do vídeo para footer...");
 			await new Promise<void>((resolve) => {
 				const checkDimensions = () => {
-					console.log("🔍 DEBUG: Verificando dimensões:", {
-						videoWidth: this.video.videoWidth,
-						videoHeight: this.video.videoHeight,
-						readyState: this.video.readyState,
-					});
 					if (this.video.videoWidth > 0 && this.video.videoHeight > 0) {
-						console.log("🔍 DEBUG: Dimensões do vídeo prontas!");
 						resolve();
 					} else {
 						setTimeout(checkDimensions, 10);
@@ -152,15 +110,9 @@ export class VideoFooterComposer {
 	}
 
 	private startComposition() {
-		console.log("🔍 DEBUG: VideoFooterComposer: Iniciando loop de composição");
-		let frameCount = 0;
+		console.log("VideoFooterComposer: Iniciando loop de composição");
 
 		const draw = () => {
-			frameCount++;
-			if (frameCount % 300 === 0) {
-				// Log a cada 10 segundos (30fps * 10s = 300 frames)
-				console.log("🔍 DEBUG: Footer renderizando frame", frameCount);
-			}
 			if (!this.config.isEnabled) {
 				console.log(
 					"VideoFooterComposer: Footer desabilitado, desenhando apenas vídeo",
@@ -178,38 +130,30 @@ export class VideoFooterComposer {
 				this.ctx.fillStyle = "#000000";
 				this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-				// Calculate original content height (total height - footer height)
-				const originalContentHeight = this.canvas.height - this.config.height;
-
-				// Draw original video in the upper portion
-				// Use the FULL source video dimensions and scale to fit the available space
+				// Draw original video at full size (footer will overlay on top)
 				this.ctx.drawImage(
 					this.video,
 					0,
 					0, // source x, y
-					this.video.videoWidth || this.canvas.width, // source width (full video width)
-					this.video.videoHeight || this.canvas.height, // source height (full video height)
+					this.video.videoWidth || this.canvas.width, // source width
+					this.video.videoHeight || this.canvas.height, // source height
 					0,
 					0, // destination x, y
-					this.canvas.width, // destination width
-					originalContentHeight, // destination height (compressed to fit above footer)
+					this.canvas.width, // destination width (full canvas width)
+					this.canvas.height, // destination height (full canvas height)
 				);
 
-				// Draw footer area (empty space) at the bottom
+				// Draw footer overlay at the bottom
+				const footerY = this.canvas.height - this.config.height;
 				this.ctx.fillStyle = "rgba(31, 41, 55, 0.95)"; // Dark background similar to header
-				this.ctx.fillRect(
-					0,
-					originalContentHeight,
-					this.canvas.width,
-					this.config.height,
-				);
+				this.ctx.fillRect(0, footerY, this.canvas.width, this.config.height);
 
-				// Optional: Add subtle border between content and footer
+				// Optional: Add subtle border at top of footer
 				this.ctx.strokeStyle = "rgba(107, 114, 128, 0.5)";
 				this.ctx.lineWidth = 1;
 				this.ctx.beginPath();
-				this.ctx.moveTo(0, originalContentHeight);
-				this.ctx.lineTo(this.canvas.width, originalContentHeight);
+				this.ctx.moveTo(0, footerY);
+				this.ctx.lineTo(this.canvas.width, footerY);
 				this.ctx.stroke();
 			}
 
