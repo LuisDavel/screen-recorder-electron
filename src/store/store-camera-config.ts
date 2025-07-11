@@ -1,272 +1,145 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export type CameraPosition =
-  | "top-left"
-  | "top-right"
-  | "bottom-left"
-  | "bottom-right";
-export type CameraSize = "small" | "medium" | "large";
-
-interface CameraDevice {
-  deviceId: string;
-  label: string;
+export interface CameraPosition {
+	x: number;
+	y: number;
 }
 
-interface CameraConfigState {
-  // Camera settings
-  isEnabled: boolean;
-  position: CameraPosition;
-  size: CameraSize;
-  selectedDeviceId: string | null;
-  devices: CameraDevice[];
-
-  // Camera streams
-  mainStream: MediaStream | null;
-  previewStream: MediaStream | null;
-
-  // Loading states
-  isInitializing: boolean;
-  isPreviewActive: boolean;
-
-  // Actions
-  setEnabled: (enabled: boolean) => void;
-  setPosition: (position: CameraPosition) => void;
-  setSize: (size: CameraSize) => void;
-  setSelectedDeviceId: (deviceId: string | null) => void;
-  setDevices: (devices: CameraDevice[]) => void;
-  setMainStream: (stream: MediaStream | null) => void;
-  setPreviewStream: (stream: MediaStream | null) => void;
-  setIsInitializing: (initializing: boolean) => void;
-  setIsPreviewActive: (active: boolean) => void;
-
-  // Notification callbacks
-  onSuccess?: (message: string) => void;
-  onError?: (message: string) => void;
-  onWarning?: (message: string) => void;
-  onInfo?: (message: string) => void;
-  setNotificationCallbacks: (callbacks: {
-    onSuccess?: (message: string) => void;
-    onError?: (message: string) => void;
-    onWarning?: (message: string) => void;
-    onInfo?: (message: string) => void;
-  }) => void;
-
-  // Stream management
-  initializeMainStream: () => Promise<void>;
-  initializePreviewStream: () => Promise<void>;
-  stopMainStream: () => void;
-  stopPreviewStream: () => void;
-  stopAllStreams: () => void;
-
-  // Utility actions
-  toggleEnabled: () => void;
-  resetConfig: () => void;
+export interface CameraSize {
+	width: number;
+	height: number;
 }
 
-const defaultState = {
-  isEnabled: false,
-  position: "bottom-right" as CameraPosition,
-  size: "medium" as CameraSize,
-  selectedDeviceId: null,
-  devices: [],
-  mainStream: null,
-  previewStream: null,
-  isInitializing: false,
-  isPreviewActive: false,
-};
+export interface CameraConfig {
+	deviceId: string;
+	isEnabled: boolean;
+	position: "top-left" | "top-right" | "bottom-left" | "bottom-right";
+	size: "small" | "medium" | "large";
+	mainStream: MediaStream | null;
+	isLoading: boolean;
+	currentConstraints: MediaTrackConstraints | null;
+	deviceList: MediaDeviceInfo[];
+	hasPermission: boolean;
+	error: string | null;
+	// Additional properties for dialog
+	selectedDeviceId: string | null;
+	devices: { deviceId: string; label: string }[];
+	previewStream: MediaStream | null;
+	isPreviewActive: boolean;
+}
 
-export const useCameraConfigStore = create<CameraConfigState>()(
-  persist(
-    (set, get) => ({
-      ...defaultState,
+export interface CameraConfigActions {
+	setDeviceId: (deviceId: string) => void;
+	setIsEnabled: (isEnabled: boolean) => void;
+	setPosition: (position: CameraConfig["position"]) => void;
+	setSize: (size: CameraConfig["size"]) => void;
+	setMainStream: (stream: MediaStream | null) => void;
+	setIsLoading: (isLoading: boolean) => void;
+	setCurrentConstraints: (constraints: MediaTrackConstraints | null) => void;
+	setDeviceList: (devices: MediaDeviceInfo[]) => void;
+	setHasPermission: (hasPermission: boolean) => void;
+	setError: (error: string | null) => void;
+	// Additional actions for dialog
+	setEnabled: (enabled: boolean) => void;
+	setSelectedDeviceId: (deviceId: string | null) => void;
+	setDevices: (devices: { deviceId: string; label: string }[]) => void;
+	setPreviewStream: (stream: MediaStream | null) => void;
+	setIsPreviewActive: (active: boolean) => void;
+	initializePreviewStream: () => Promise<void>;
+	stopPreviewStream: () => void;
+	// Notification callbacks
+	onSuccess?: (message: string) => void;
+	onError?: (message: string) => void;
+	onWarning?: (message: string) => void;
+	onInfo?: (message: string) => void;
+	setNotificationCallbacks: (callbacks: {
+		onSuccess?: (message: string) => void;
+		onError?: (message: string) => void;
+		onWarning?: (message: string) => void;
+		onInfo?: (message: string) => void;
+	}) => void;
+}
 
-      setEnabled: (enabled) => set({ isEnabled: enabled }),
+export type CameraConfigStore = CameraConfig & CameraConfigActions;
 
-      setPosition: (position) => set({ position }),
+export const useCameraConfigStore = create<CameraConfigStore>()(
+	persist(
+		(set, get) => ({
+			// Initial state
+			deviceId: "",
+			isEnabled: false,
+			position: "top-right",
+			size: "medium",
+			mainStream: null,
+			isLoading: false,
+			currentConstraints: null,
+			deviceList: [],
+			hasPermission: false,
+			error: null,
+			selectedDeviceId: null,
+			devices: [],
+			previewStream: null,
+			isPreviewActive: false,
 
-      setSize: (size) => set({ size }),
-
-      setSelectedDeviceId: (deviceId) => set({ selectedDeviceId: deviceId }),
-
-      setDevices: (devices) => set({ devices }),
-
-      setMainStream: (stream) => set({ mainStream: stream }),
-
-      setPreviewStream: (stream) => set({ previewStream: stream }),
-
-      setIsInitializing: (initializing) =>
-        set({ isInitializing: initializing }),
-
-      setIsPreviewActive: (active) => set({ isPreviewActive: active }),
-
-      initializeMainStream: async () => {
-        const { selectedDeviceId, isEnabled, mainStream, isInitializing } =
-          get();
-
-        if (!isEnabled || !selectedDeviceId || isInitializing) {
-          return;
-        }
-
-        // Stop existing stream if any
-        if (mainStream) {
-          mainStream.getTracks().forEach((track) => track.stop());
-        }
-
-        set({ isInitializing: true, mainStream: null });
-
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              deviceId: selectedDeviceId,
-              width: { ideal: 320 },
-              height: { ideal: 240 },
-            },
-            audio: false,
-          });
-
-          set({ mainStream: stream, isInitializing: false });
-
-          // Notify success
-          const { onSuccess } = get();
-          onSuccess?.("Câmera inicializada com sucesso");
-        } catch (error) {
-          console.error("Erro ao inicializar câmera:", error);
-
-          // Notify error
-          const { onError } = get();
-          onError?.(
-            "Erro ao inicializar câmera: " +
-              (error instanceof Error ? error.message : String(error)),
-          );
-
-          // Try with basic constraints
-          try {
-            const fallbackStream = await navigator.mediaDevices.getUserMedia({
-              video: true,
-              audio: false,
-            });
-            set({ mainStream: fallbackStream, isInitializing: false });
-
-            // Notify fallback success
-            const { onWarning } = get();
-            onWarning?.("Câmera inicializada com configurações básicas");
-          } catch (fallbackError) {
-            console.error("Fallback falhou:", fallbackError);
-            set({ isInitializing: false });
-
-            // Notify fallback error
-            const { onError } = get();
-            onError?.("Falha completa ao inicializar câmera");
-          }
-        }
-      },
-
-      initializePreviewStream: async () => {
-        const { selectedDeviceId, previewStream, isPreviewActive } = get();
-
-        if (!selectedDeviceId || !isPreviewActive || previewStream) {
-          return;
-        }
-
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              deviceId: selectedDeviceId,
-              width: { ideal: 320 },
-              height: { ideal: 240 },
-            },
-            audio: false,
-          });
-
-          set({ previewStream: stream });
-        } catch (error) {
-          console.error("Erro ao inicializar stream de preview:", error);
-        }
-      },
-
-      stopMainStream: () => {
-        const { mainStream } = get();
-        if (mainStream) {
-          mainStream.getTracks().forEach((track) => track.stop());
-          set({ mainStream: null });
-        }
-      },
-
-      stopPreviewStream: () => {
-        const { previewStream } = get();
-        if (previewStream) {
-          previewStream.getTracks().forEach((track) => track.stop());
-          set({ previewStream: null });
-        }
-      },
-
-      stopAllStreams: () => {
-        const { mainStream, previewStream } = get();
-        if (mainStream) {
-          mainStream.getTracks().forEach((track) => track.stop());
-        }
-        if (previewStream) {
-          previewStream.getTracks().forEach((track) => track.stop());
-        }
-        set({ mainStream: null, previewStream: null });
-      },
-
-      toggleEnabled: () => {
-        const { isEnabled } = get();
-        const newEnabled = !isEnabled;
-
-        if (newEnabled) {
-          set({ isEnabled: newEnabled });
-
-          // Notify camera enabled
-          const { onInfo } = get();
-          onInfo?.("Câmera habilitada");
-
-          // Force immediate initialization when enabled
-          get().initializeMainStream();
-        } else {
-          get().stopAllStreams();
-          set({ isEnabled: newEnabled });
-
-          // Notify camera disabled
-          const { onInfo } = get();
-          onInfo?.("Câmera desabilitada");
-        }
-      },
-
-      resetConfig: () => {
-        get().stopAllStreams();
-        set(defaultState);
-      },
-
-      // Force initialization - useful for debugging
-      forceInitialize: () => {
-        const { selectedDeviceId, isEnabled } = get();
-        if (isEnabled && selectedDeviceId) {
-          get().initializeMainStream();
-        }
-      },
-
-      setNotificationCallbacks: (callbacks) => {
-        set({
-          onSuccess: callbacks.onSuccess,
-          onError: callbacks.onError,
-          onWarning: callbacks.onWarning,
-          onInfo: callbacks.onInfo,
-        });
-      },
-    }),
-    {
-      name: "camera-config-storage",
-      // Don't persist the stream
-      partialize: (state) => ({
-        isEnabled: state.isEnabled,
-        position: state.position,
-        size: state.size,
-        selectedDeviceId: state.selectedDeviceId,
-        devices: state.devices,
-      }),
-    },
-  ),
+			// Actions
+			setDeviceId: (deviceId) => set({ deviceId }),
+			setIsEnabled: (isEnabled) => set({ isEnabled }),
+			setPosition: (position) => set({ position }),
+			setSize: (size) => set({ size }),
+			setMainStream: (stream) => set({ mainStream: stream }),
+			setIsLoading: (isLoading) => set({ isLoading }),
+			setCurrentConstraints: (constraints) =>
+				set({ currentConstraints: constraints }),
+			setDeviceList: (devices) => set({ deviceList: devices }),
+			setHasPermission: (hasPermission) => set({ hasPermission }),
+			setError: (error) => set({ error }),
+			// Additional actions for dialog
+			setEnabled: (enabled) => set({ isEnabled: enabled }),
+			setSelectedDeviceId: (deviceId) => set({ selectedDeviceId: deviceId }),
+			setDevices: (devices) => set({ devices }),
+			setPreviewStream: (stream) => set({ previewStream: stream }),
+			setIsPreviewActive: (active) => set({ isPreviewActive: active }),
+			initializePreviewStream: async () => {
+				const { selectedDeviceId } = get();
+				if (selectedDeviceId) {
+					try {
+						const stream = await navigator.mediaDevices.getUserMedia({
+							video: { deviceId: selectedDeviceId },
+						});
+						set({ previewStream: stream });
+					} catch (error) {
+						console.error("Erro ao inicializar preview stream:", error);
+					}
+				}
+			},
+			stopPreviewStream: () => {
+				const { previewStream } = get();
+				if (previewStream) {
+					previewStream
+						.getTracks()
+						.forEach((track: MediaStreamTrack) => track.stop());
+					set({ previewStream: null });
+				}
+			},
+			// Notification callbacks
+			setNotificationCallbacks: (callbacks) =>
+				set({
+					onSuccess: callbacks.onSuccess,
+					onError: callbacks.onError,
+					onWarning: callbacks.onWarning,
+					onInfo: callbacks.onInfo,
+				}),
+		}),
+		{
+			name: "camera-config",
+			partialize: (state) => ({
+				deviceId: state.deviceId,
+				isEnabled: state.isEnabled,
+				position: state.position,
+				size: state.size,
+				// Don't persist streams or loading states
+			}),
+		},
+	),
 );
