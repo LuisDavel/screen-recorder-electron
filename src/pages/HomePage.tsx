@@ -80,6 +80,44 @@ export default function HomePage() {
 									<MicrophoneConfigDialog />
 								</div>
 
+								{/* Botão de teste temporário */}
+								<Button
+									onClick={async () => {
+										const microphoneStore = useMicrophoneConfigStore.getState();
+										console.log("=== TESTE DO MICROFONE ===");
+										console.log(
+											"Microfone habilitado:",
+											microphoneStore.isEnabled,
+										);
+										console.log(
+											"Stream principal:",
+											!!microphoneStore.mainStream,
+										);
+										if (microphoneStore.mainStream) {
+											console.log(
+												"Tracks de áudio:",
+												microphoneStore.mainStream.getAudioTracks().length,
+											);
+											console.log(
+												"Tracks de áudio detalhes:",
+												microphoneStore.mainStream
+													.getAudioTracks()
+													.map((track) => ({
+														id: track.id,
+														label: track.label,
+														enabled: track.enabled,
+														readyState: track.readyState,
+														muted: track.muted,
+													})),
+											);
+										}
+									}}
+									variant="outline"
+									className="w-full"
+								>
+									🎤 Testar Microfone (Console)
+								</Button>
+
 								<div className="grid grid-cols-2 gap-2">
 									<div className="bg-muted/50 flex items-center justify-between rounded-xl backdrop-blur-sm p-3">
 										<div className="flex items-center space-x-3">

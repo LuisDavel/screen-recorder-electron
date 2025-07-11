@@ -4,6 +4,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { AdvancedScreenRecorderManager } from "@/helpers/advanced-screen-recorder";
 import { useCameraConfigStore } from "@/store/store-camera-config";
+import { useMicrophoneConfigStore } from "@/store/store-microphone-config";
 import { useHeaderConfigStore } from "@/store/store-header-config";
 import { useToastHelpers } from "@/components/Toast";
 import {
@@ -13,6 +14,8 @@ import {
 	Camera,
 	CameraOff,
 	FileText,
+	Mic,
+	MicOff,
 } from "lucide-react";
 
 interface RecordingControlsProps {
@@ -31,11 +34,14 @@ export function RecordingControls({
 	const [recordingTime, setRecordingTime] = useState(0);
 	const [recorder] = useState(() => new AdvancedScreenRecorderManager());
 	const [includeCameraOverlay, setIncludeCameraOverlay] = useState(true);
+	const [includeMicrophone, setIncludeMicrophone] = useState(true);
 	const [includeHeader, setIncludeHeader] = useState(false);
 
 	// Camera store e notifications
 	const { isEnabled: cameraEnabled, mainStream: cameraStream } =
 		useCameraConfigStore();
+	const { isEnabled: microphoneEnabled, mainStream: microphoneStream } =
+		useMicrophoneConfigStore();
 	const { headerConfig } = useHeaderConfigStore();
 	const { showSuccess, showError, showInfo } = useToastHelpers();
 
@@ -90,12 +96,28 @@ export function RecordingControls({
 				return;
 			}
 
+			// Verificar se microfone está habilitado mas usuário quer incluir áudio
+			if (includeMicrophone && !microphoneEnabled) {
+				showError(
+					"Microfone deve estar habilitado para incluir áudio na gravação",
+				);
+				return;
+			}
+
+			if (includeMicrophone && microphoneEnabled && !microphoneStream) {
+				showError(
+					"Stream do microfone não disponível. Verifique as configurações do microfone",
+				);
+				return;
+			}
+
 			const options = AdvancedScreenRecorderManager.getRecommendedOptions(
 				selectedSourceId.id,
 				selectedSaveLocation,
 			);
 
 			options.includeCameraOverlay = includeCameraOverlay && cameraEnabled;
+			options.includeMicrophone = includeMicrophone && microphoneEnabled;
 			options.includeHeader = includeHeader && headerConfig.isEnabled;
 			options.headerConfig = headerConfig;
 
@@ -105,6 +127,9 @@ export function RecordingControls({
 			let message = "Gravação iniciada";
 			if (includeCameraOverlay && cameraEnabled) {
 				message += " com câmera";
+			}
+			if (includeMicrophone && microphoneEnabled) {
+				message += " com áudio";
 			}
 			if (includeHeader && headerConfig.isEnabled) {
 				message += " com header informativo";
@@ -184,6 +209,38 @@ export function RecordingControls({
 						checked={includeCameraOverlay}
 						onCheckedChange={setIncludeCameraOverlay}
 						disabled={!cameraEnabled}
+					/>
+				</div>
+			)}
+
+			{/* Microphone Option */}
+			{!isRecording && (
+				<div className="bg-muted/50 flex items-center justify-between rounded-xl p-4 backdrop-blur-sm">
+					<div className="flex items-center space-x-3">
+						{includeMicrophone && microphoneEnabled ? (
+							<Mic className="h-4 w-4 text-green-600" />
+						) : (
+							<MicOff className="h-4 w-4 text-gray-400" />
+						)}
+						<div className="flex flex-col">
+							<Label
+								htmlFor="microphone-overlay"
+								className="text-sm font-medium"
+							>
+								Incluir microfone na gravação
+							</Label>
+							<span className="text-muted-foreground text-xs">
+								{microphoneEnabled
+									? "Áudio do microfone será incluído no vídeo"
+									: "Habilite o microfone primeiro"}
+							</span>
+						</div>
+					</div>
+					<Switch
+						id="microphone-overlay"
+						checked={includeMicrophone}
+						onCheckedChange={setIncludeMicrophone}
+						disabled={!microphoneEnabled}
 					/>
 				</div>
 			)}

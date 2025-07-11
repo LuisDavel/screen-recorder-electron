@@ -151,11 +151,16 @@ export function MicrophoneConfigDialog({
 		}
 
 		return () => {
-			if (audioContextRef.current) {
-				audioContextRef.current.close();
-			}
 			if (animationFrameRef.current) {
 				cancelAnimationFrame(animationFrameRef.current);
+			}
+			if (
+				audioContextRef.current &&
+				audioContextRef.current.state !== "closed"
+			) {
+				audioContextRef.current.close().catch((error) => {
+					console.warn("Erro ao fechar AudioContext:", error);
+				});
 			}
 		};
 	}, [previewStream, isOpen]);
