@@ -42,9 +42,9 @@ export class VideoHeaderComposer {
 			audioTracks: sourceStream.getAudioTracks().length,
 		});
 
-		// Set canvas dimensions to match original video (header will overlay)
+		// Set canvas dimensions to include header height (composition mode)
 		this.canvas.width = width;
-		this.canvas.height = height;
+		this.canvas.height = height + this.headerConfig.height;
 
 		console.log("VideoHeaderComposer: Canvas configurado", {
 			canvasWidth: this.canvas.width,
@@ -187,17 +187,21 @@ export class VideoHeaderComposer {
 
 				// Verificação uma vez só para detectar problemas
 				if (!this.dimensionsLogged) {
-					const canvasAspectRatio = this.canvas.width / this.canvas.height;
+					const videoAreaWidth = this.canvas.width;
+					const videoAreaHeight = this.canvas.height - this.headerConfig.height;
+					const videoAreaAspectRatio = videoAreaWidth / videoAreaHeight;
 					const videoAspectRatio = videoWidth / videoHeight;
 					const aspectRatioDiff = Math.abs(
-						canvasAspectRatio - videoAspectRatio,
+						videoAreaAspectRatio - videoAspectRatio,
 					);
 
-					console.log("🎬 HeaderComposer renderização:", {
-						canvas: `${this.canvas.width}x${this.canvas.height}`,
-						video: `${videoWidth}x${videoHeight}`,
+					console.log("🎬 HeaderComposer renderização (composition mode):", {
+						canvasTotal: `${this.canvas.width}x${this.canvas.height}`,
+						videoOriginal: `${videoWidth}x${videoHeight}`,
+						videoArea: `${videoAreaWidth}x${videoAreaHeight}`,
+						headerHeight: this.headerConfig.height,
 						aspectRatios: {
-							canvas: canvasAspectRatio.toFixed(3),
+							videoArea: videoAreaAspectRatio.toFixed(3),
 							video: videoAspectRatio.toFixed(3),
 						},
 						distorção: aspectRatioDiff > 0.01 ? "⚠️ SIM" : "✅ NÃO",
@@ -206,20 +210,45 @@ export class VideoHeaderComposer {
 					this.dimensionsLogged = true;
 				}
 
-				// Draw original video at full size (header will overlay on top)
+				// Calculate video area (canvas minus header space)
+				const videoAreaWidth = this.canvas.width;
+				const videoAreaHeight = this.canvas.height - this.headerConfig.height;
+				const videoAreaY = this.headerConfig.height; // Start below header
+
+				// Calculate aspect ratio preserving dimensions for video area
+				const videoAreaAspectRatio = videoAreaWidth / videoAreaHeight;
+				const videoAspectRatio = videoWidth / videoHeight;
+
+				let drawWidth = videoAreaWidth;
+				let drawHeight = videoAreaHeight;
+				let drawX = 0;
+				let drawY = videoAreaY;
+
+				// Maintain aspect ratio - fit video to available area (below header)
+				if (videoAspectRatio > videoAreaAspectRatio) {
+					// Video is wider than available area
+					drawHeight = videoAreaWidth / videoAspectRatio;
+					drawY = videoAreaY + (videoAreaHeight - drawHeight) / 2;
+				} else {
+					// Video is taller than available area
+					drawWidth = videoAreaHeight * videoAspectRatio;
+					drawX = (videoAreaWidth - drawWidth) / 2;
+				}
+
+				// Draw video maintaining aspect ratio in the area below header
 				this.ctx.drawImage(
 					this.video,
 					0,
 					0, // source x, y
-					this.video.videoWidth || this.canvas.width, // source width
-					this.video.videoHeight || this.canvas.height, // source height
-					0,
-					0, // destination x, y
-					this.canvas.width, // destination width (full canvas width)
-					this.canvas.height, // destination height (full canvas height)
+					videoWidth, // source width
+					videoHeight, // source height
+					drawX,
+					drawY, // destination x, y
+					drawWidth, // destination width
+					drawHeight, // destination height
 				);
 
-				// Draw header overlay at the top
+				// Draw header at the top
 				this.drawHeader();
 			}
 
@@ -232,7 +261,7 @@ export class VideoHeaderComposer {
 	private drawHeader() {
 		const headerHeight = this.headerConfig.height;
 
-		// Draw header overlay background at top
+		// Draw header background at top
 		this.ctx.fillStyle = "rgba(17, 24, 39, 0.95)"; // gray-900 with opacity
 		this.ctx.fillRect(0, 0, this.canvas.width, headerHeight);
 

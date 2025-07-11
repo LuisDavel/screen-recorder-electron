@@ -7,6 +7,7 @@ export class VideoFooterComposer {
 	private animationFrameId: number | null = null;
 	private stream: MediaStream | null = null;
 	private config: FooterConfig;
+	private dimensionsLogged = false;
 
 	constructor(config: FooterConfig) {
 		this.config = config;
@@ -48,15 +49,15 @@ export class VideoFooterComposer {
 			return inputStream;
 		}
 
-		// Set canvas dimensions to match original video (footer will overlay)
+		// Set canvas dimensions to include footer height (composition mode)
 		this.canvas.width = width;
-		this.canvas.height = height;
+		this.canvas.height = height + this.config.height;
 
 		console.log("VideoFooterComposer: Canvas configurado", {
 			canvasWidth: this.canvas.width,
 			canvasHeight: this.canvas.height,
 			footerHeight: this.config.height,
-			mode: "overlay",
+			mode: "composition",
 		});
 
 		// Set video source
@@ -130,30 +131,95 @@ export class VideoFooterComposer {
 				this.ctx.fillStyle = "#000000";
 				this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-				// Draw original video at full size (footer will overlay on top)
+				// Calculate aspect ratio preserving dimensions
+				const videoWidth = this.video.videoWidth || this.canvas.width;
+				const videoHeight = this.video.videoHeight || this.canvas.height;
+				const videoAspectRatio = videoWidth / videoHeight;
+
+				// Debug: log das dimensões para detectar problemas (uma vez só)
+				if (!this.dimensionsLogged) {
+					const videoAreaWidth = this.canvas.width;
+					const videoAreaHeight = this.canvas.height - this.config.height;
+					const videoAreaAspectRatio = videoAreaWidth / videoAreaHeight;
+					const aspectRatioDiff = Math.abs(
+						videoAreaAspectRatio - videoAspectRatio,
+					);
+
+					console.log("🎬 FooterComposer renderização (composition mode):", {
+						canvasTotal: `${this.canvas.width}x${this.canvas.height}`,
+						videoOriginal: `${videoWidth}x${videoHeight}`,
+						videoArea: `${videoAreaWidth}x${videoAreaHeight}`,
+						footerHeight: this.config.height,
+						aspectRatios: {
+							videoArea: videoAreaAspectRatio.toFixed(3),
+							video: videoAspectRatio.toFixed(3),
+						},
+						distorção: aspectRatioDiff > 0.01 ? "⚠️ SIM" : "✅ NÃO",
+					});
+
+					this.dimensionsLogged = true;
+				}
+
+				// Calculate video area (canvas minus footer space)
+				const videoAreaWidth = this.canvas.width;
+				const videoAreaHeight = this.canvas.height - this.config.height;
+				const videoAreaY = 0; // Start at top
+
+				// Calculate aspect ratio preserving dimensions for video area
+				const videoAreaAspectRatio = videoAreaWidth / videoAreaHeight;
+
+				let drawWidth = videoAreaWidth;
+				let drawHeight = videoAreaHeight;
+				let drawX = 0;
+				let drawY = videoAreaY;
+
+				// Maintain aspect ratio - fit video to available area (above footer)
+				if (videoAspectRatio > videoAreaAspectRatio) {
+					// Video is wider than available area
+					drawHeight = videoAreaWidth / videoAspectRatio;
+					drawY = videoAreaY + (videoAreaHeight - drawHeight) / 2;
+				} else {
+					// Video is taller than available area
+					drawWidth = videoAreaHeight * videoAspectRatio;
+					drawX = (videoAreaWidth - drawWidth) / 2;
+				}
+
+				// Ensure footer position doesn't exceed canvas bounds
+				const footerBottomY = drawY + drawHeight + this.config.height;
+				if (footerBottomY > this.canvas.height) {
+					// Adjust video position to make room for footer
+					const adjustment = footerBottomY - this.canvas.height;
+					drawY = Math.max(0, drawY - adjustment);
+				}
+
+				// Draw video maintaining aspect ratio in the area above footer
 				this.ctx.drawImage(
 					this.video,
 					0,
 					0, // source x, y
-					this.video.videoWidth || this.canvas.width, // source width
-					this.video.videoHeight || this.canvas.height, // source height
-					0,
-					0, // destination x, y
-					this.canvas.width, // destination width (full canvas width)
-					this.canvas.height, // destination height (full canvas height)
+					videoWidth, // source width
+					videoHeight, // source height
+					drawX,
+					drawY, // destination x, y
+					drawWidth, // destination width
+					drawHeight, // destination height
 				);
 
-				// Draw footer overlay at the bottom
+				// Draw footer at bottom, centered on canvas
 				const footerY = this.canvas.height - this.config.height;
-				this.ctx.fillStyle = "rgba(31, 41, 55, 0.95)"; // Dark background similar to header
-				this.ctx.fillRect(0, footerY, this.canvas.width, this.config.height);
+				const footerWidth = Math.min(drawWidth, this.canvas.width);
+				const footerX = (this.canvas.width - footerWidth) / 2;
 
-				// Optional: Add subtle border at top of footer
+				// Draw footer background (centered)
+				this.ctx.fillStyle = "rgba(17, 24, 39, 0.95)"; // Same color as header top
+				this.ctx.fillRect(footerX, footerY, footerWidth, this.config.height);
+
+				// Add subtle border at top of footer
 				this.ctx.strokeStyle = "rgba(107, 114, 128, 0.5)";
 				this.ctx.lineWidth = 1;
 				this.ctx.beginPath();
-				this.ctx.moveTo(0, footerY);
-				this.ctx.lineTo(this.canvas.width, footerY);
+				this.ctx.moveTo(footerX, footerY);
+				this.ctx.lineTo(footerX + footerWidth, footerY);
 				this.ctx.stroke();
 			}
 
