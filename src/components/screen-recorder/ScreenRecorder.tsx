@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 
 import { RecordingControls } from "./RecordingControls";
 import VideoPreviewWithHeader from "./VideoPreviewWithHeader";
+import { CountdownPopup } from "@/components/CountdownPopup";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Monitor, ArrowLeft } from "lucide-react";
@@ -11,9 +12,27 @@ import { Link } from "@tanstack/react-router";
 
 export default React.memo(function ScreenRecorder() {
 	const [isRecording, setIsRecording] = useState(false);
+	const [countdown, setCountdown] = useState<number | null>(null);
 	const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
+	const [showTestPopup, setShowTestPopup] = useState(false);
 	const { saveLocation } = useSaveLocationStore();
 	const { sourceId } = useSourceVideoStore();
+
+	// Log para debug da contagem regressiva
+	useEffect(() => {
+		console.log("🎬 ScreenRecorder - Contagem regressiva mudou:", countdown);
+	}, [countdown]);
+
+	// Função para atualizar contagem regressiva com logs
+	const handleCountdownChange = useCallback((newCountdown: number | null) => {
+		console.log("🎬 ScreenRecorder - Recebendo nova contagem:", newCountdown);
+		setCountdown(newCountdown);
+		console.log("🎬 ScreenRecorder - Estado atualizado para:", newCountdown);
+
+		// Debug para verificar se o isOpen será calculado corretamente
+		const willBeOpen = newCountdown !== null && newCountdown >= 0;
+		console.log("🎬 ScreenRecorder - Popup será aberto:", willBeOpen);
+	}, []);
 
 	// Memoize the preview stream generation function
 	const getPreviewStream = useCallback(async (sourceIdValue: string) => {
@@ -175,9 +194,27 @@ export default React.memo(function ScreenRecorder() {
 						selectedSourceId={sourceId}
 						onRecordingStateChange={handleRecordingStateChange}
 						selectedSaveLocation={saveLocation}
+						onCountdownChange={handleCountdownChange}
 					/>
+
+					{/* Botão de teste temporário */}
+					<div className="mt-4 p-2 bg-yellow-100 rounded">
+						<Button
+							onClick={() => setShowTestPopup(!showTestPopup)}
+							variant="outline"
+							size="sm"
+						>
+							Teste Popup (countdown: {countdown})
+						</Button>
+					</div>
 				</CardContent>
 			</Card>
+
+			{/* Popup de contagem regressiva */}
+			<CountdownPopup countdown={countdown} isOpen={countdown !== null} />
+
+			{/* Popup de teste */}
+			<CountdownPopup countdown={3} isOpen={showTestPopup} />
 		</div>
 	);
 });

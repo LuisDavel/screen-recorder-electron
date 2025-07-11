@@ -7,6 +7,7 @@ import { useCameraConfigStore } from "@/store/store-camera-config";
 import { useMicrophoneConfigStore } from "@/store/store-microphone-config";
 import { useHeaderConfigStore } from "@/store/store-header-config";
 import { useToastHelpers } from "@/components/Toast";
+import { minimizeWindow } from "@/helpers/window_helpers";
 import {
 	Play,
 	Square,
@@ -22,20 +23,33 @@ interface RecordingControlsProps {
 	selectedSourceId: { id: string; name: string; thumbnail: string } | null;
 	onRecordingStateChange: (isRecording: boolean) => void;
 	selectedSaveLocation: string | null;
+	onCountdownChange?: (countdown: number | null) => void;
 }
 
 export function RecordingControls({
 	selectedSourceId,
 	onRecordingStateChange,
 	selectedSaveLocation,
+	onCountdownChange,
 }: RecordingControlsProps) {
 	const [isRecording, setIsRecording] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
 	const [recordingTime, setRecordingTime] = useState(0);
+	const [countdown, setCountdown] = useState<number | null>(null);
 	const [recorder] = useState(() => new AdvancedScreenRecorderManager());
-	const [includeCameraOverlay, setIncludeCameraOverlay] = useState(true);
-	const [includeMicrophone, setIncludeMicrophone] = useState(true);
+	const [includeCameraOverlay, setIncludeCameraOverlay] = useState(false);
+	const [includeMicrophone, setIncludeMicrophone] = useState(false);
 	const [includeHeader, setIncludeHeader] = useState(false);
+
+	// Debug log para verificar props
+	useEffect(() => {
+		console.log("🔧 RecordingControls props:", {
+			hasOnCountdownChange: !!onCountdownChange,
+			onCountdownChangeType: typeof onCountdownChange,
+			selectedSourceId: !!selectedSourceId,
+			selectedSaveLocation: !!selectedSaveLocation,
+		});
+	}, [onCountdownChange, selectedSourceId, selectedSaveLocation]);
 
 	// Camera store e notifications
 	const { isEnabled: cameraEnabled, mainStream: cameraStream } =
@@ -67,7 +81,56 @@ export function RecordingControls({
 		onRecordingStateChange(isRecording);
 	}, [isRecording, onRecordingStateChange]);
 
+	// Notificar mudanças na contagem regressiva
+	useEffect(() => {
+		console.log("📊 Mudança na contagem regressiva:", countdown);
+		console.log("📊 onCountdownChange disponível:", !!onCountdownChange);
+
+		// Sempre tentar notificar, mesmo se onCountdownChange for undefined
+		try {
+			if (onCountdownChange && typeof onCountdownChange === "function") {
+				console.log("📢 Chamando onCountdownChange com valor:", countdown);
+				onCountdownChange(countdown);
+				console.log("✅ onCountdownChange chamado com sucesso");
+			} else {
+				console.log(
+					"⚠️ onCountdownChange não é uma função válida:",
+					typeof onCountdownChange,
+				);
+			}
+		} catch (error) {
+			console.error("❌ Erro ao chamar onCountdownChange:", error);
+		}
+	}, [countdown, onCountdownChange]);
+
+	// Iniciar contagem regressiva
+	const startCountdown = async (): Promise<void> => {
+		console.log("🚀 Iniciando contagem regressiva...");
+		console.log("🔄 onCountdownChange disponível:", !!onCountdownChange);
+
+		return new Promise((resolve) => {
+			let count = 3;
+			console.log("Contagem inicial:", count);
+			setCountdown(count);
+
+			const interval = setInterval(() => {
+				count--;
+				console.log("Contagem atual:", count);
+				setCountdown(count);
+
+				if (count < 0) {
+					console.log("Contagem terminada!");
+					setCountdown(null);
+					clearInterval(interval);
+					resolve();
+				}
+			}, 1000);
+		});
+	};
+
 	const handleStartRecording = async () => {
+		console.log("🎬 handleStartRecording chamada");
+
 		if (!selectedSourceId) {
 			alert("Por favor, selecione uma fonte para gravar");
 			return;
@@ -80,9 +143,22 @@ export function RecordingControls({
 
 		try {
 			setIsLoading(true);
+			console.log("🎬 Loading ativado, verificando condições...");
+			console.log("🎬 Estados atuais:", {
+				includeCameraOverlay,
+				includeMicrophone,
+				includeHeader,
+				cameraEnabled,
+				microphoneEnabled,
+				hasCameraStream: !!cameraStream,
+				hasMicrophoneStream: !!microphoneStream,
+			});
 
 			// Verificar se câmera está habilitada mas usuário quer incluir overlay
 			if (includeCameraOverlay && !cameraEnabled) {
+				console.log(
+					"❌ Erro: Câmera deve estar habilitada para incluir overlay",
+				);
 				showError(
 					"Câmera deve estar habilitada para incluir overlay na gravação",
 				);
@@ -90,6 +166,7 @@ export function RecordingControls({
 			}
 
 			if (includeCameraOverlay && cameraEnabled && !cameraStream) {
+				console.log("❌ Erro: Stream da câmera não disponível");
 				showError(
 					"Stream da câmera não disponível. Verifique as configurações da câmera",
 				);
@@ -98,6 +175,9 @@ export function RecordingControls({
 
 			// Verificar se microfone está habilitado mas usuário quer incluir áudio
 			if (includeMicrophone && !microphoneEnabled) {
+				console.log(
+					"❌ Erro: Microfone deve estar habilitado para incluir áudio",
+				);
 				showError(
 					"Microfone deve estar habilitado para incluir áudio na gravação",
 				);
@@ -105,11 +185,29 @@ export function RecordingControls({
 			}
 
 			if (includeMicrophone && microphoneEnabled && !microphoneStream) {
+				console.log("❌ Erro: Stream do microfone não disponível");
 				showError(
 					"Stream do microfone não disponível. Verifique as configurações do microfone",
 				);
 				return;
 			}
+
+			console.log(
+				"✅ Todas as validações passaram, iniciando contagem regressiva...",
+			);
+			// Iniciar contagem regressiva
+			await startCountdown();
+
+			// Minimizar janela após contagem
+			try {
+				await minimizeWindow();
+				console.log("Janela minimizada com sucesso");
+			} catch (error) {
+				console.warn("Erro ao minimizar janela:", error);
+			}
+
+			// Aguardar um pouco para garantir que a janela foi minimizada
+			await new Promise((resolve) => setTimeout(resolve, 500));
 
 			const options = AdvancedScreenRecorderManager.getRecommendedOptions(
 				selectedSourceId.id,
@@ -141,6 +239,7 @@ export function RecordingControls({
 				`Erro ao iniciar gravação: ${error instanceof Error ? error.message : String(error)}`,
 			);
 		} finally {
+			console.log("🎬 handleStartRecording terminando, setIsLoading(false)");
 			setIsLoading(false);
 		}
 	};
@@ -182,6 +281,40 @@ export function RecordingControls({
 						</span>
 					</div>
 				)}
+			</div>
+
+			{/* Botão de gravação */}
+			<div className="flex items-center justify-between">
+				<div className="flex items-center space-x-2">
+					<Button
+						variant={isRecording ? "destructive" : "default"}
+						size="lg"
+						onClick={isRecording ? handleStopRecording : handleStartRecording}
+						disabled={
+							isLoading ||
+							!selectedSourceId ||
+							!selectedSaveLocation ||
+							countdown !== null
+						}
+					>
+						{isLoading ? (
+							<>
+								<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+								{isRecording ? "Parando..." : "Iniciando..."}
+							</>
+						) : isRecording ? (
+							<>
+								<Square className="mr-2 h-4 w-4" />
+								Parar Gravação
+							</>
+						) : (
+							<>
+								<Play className="mr-2 h-4 w-4" />
+								Iniciar Gravação
+							</>
+						)}
+					</Button>
+				</div>
 			</div>
 
 			{/* Camera Overlay Option */}
@@ -270,35 +403,6 @@ export function RecordingControls({
 						disabled={!headerConfig.isEnabled}
 					/>
 				</div>
-			)}
-
-			{!isRecording ? (
-				<Button
-					onClick={handleStartRecording}
-					disabled={!selectedSourceId || !selectedSaveLocation || isLoading}
-					className="h-12 text-base"
-				>
-					{isLoading ? (
-						<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-					) : (
-						<Play className="mr-2 h-4 w-4" />
-					)}
-					{isLoading ? "Iniciando..." : "Iniciar Gravação"}
-				</Button>
-			) : (
-				<Button
-					onClick={handleStopRecording}
-					disabled={isLoading}
-					variant="destructive"
-					className="h-12 text-base"
-				>
-					{isLoading ? (
-						<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-					) : (
-						<Square className="mr-2 h-4 w-4" />
-					)}
-					{isLoading ? "Parando..." : "Parar Gravação"}
-				</Button>
 			)}
 
 			{(!selectedSourceId || !selectedSaveLocation) && (
