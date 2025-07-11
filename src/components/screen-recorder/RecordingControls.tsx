@@ -105,12 +105,8 @@ export function RecordingControls({
 
 	// Iniciar contagem regressiva
 	const startCountdown = async (): Promise<void> => {
-		console.log("🚀 Iniciando contagem regressiva...");
-		console.log("🔄 onCountdownChange disponível:", !!onCountdownChange);
-
 		return new Promise((resolve) => {
 			let count = 3;
-			console.log("Contagem inicial:", count);
 			setCountdown(count);
 
 			const interval = setInterval(() => {
@@ -129,8 +125,6 @@ export function RecordingControls({
 	};
 
 	const handleStartRecording = async () => {
-		console.log("🎬 handleStartRecording chamada");
-
 		if (!selectedSourceId) {
 			alert("Por favor, selecione uma fonte para gravar");
 			return;
@@ -143,16 +137,6 @@ export function RecordingControls({
 
 		try {
 			setIsLoading(true);
-			console.log("🎬 Loading ativado, verificando condições...");
-			console.log("🎬 Estados atuais:", {
-				includeCameraOverlay,
-				includeMicrophone,
-				includeHeader,
-				cameraEnabled,
-				microphoneEnabled,
-				hasCameraStream: !!cameraStream,
-				hasMicrophoneStream: !!microphoneStream,
-			});
 
 			// Verificar se câmera está habilitada mas usuário quer incluir overlay
 			if (includeCameraOverlay && !cameraEnabled) {
@@ -192,16 +176,12 @@ export function RecordingControls({
 				return;
 			}
 
-			console.log(
-				"✅ Todas as validações passaram, iniciando contagem regressiva...",
-			);
 			// Iniciar contagem regressiva
 			await startCountdown();
 
 			// Minimizar janela após contagem
 			try {
 				await minimizeWindow();
-				console.log("Janela minimizada com sucesso");
 			} catch (error) {
 				console.warn("Erro ao minimizar janela:", error);
 			}
@@ -267,161 +247,179 @@ export function RecordingControls({
 	};
 
 	return (
-		<div className="flex flex-col gap-2">
-			<div className="flex items-center justify-between">
-				<p className="text-muted-foreground text-sm">
-					{isRecording && "Gravando..."}
+		<>
+			{countdown ? (
+				<p className="text-lg font-bold text-center">
+					Contagem regressiva:{" "}
+					<span className="text-primary text-7xl">{countdown}</span>
 				</p>
+			) : (
+				<div className="flex flex-col gap-2">
+					<div className="flex items-center justify-between">
+						<p className="text-muted-foreground text-sm">
+							{isRecording && "Gravando..."}
+						</p>
 
-				{isRecording && (
-					<div className="flex items-center space-x-2">
-						<div className="h-3 w-3 animate-pulse rounded-full bg-red-500" />
-						<span className="font-mono text-lg font-bold">
-							{formatTime(recordingTime)}
-						</span>
+						{isRecording && (
+							<div className="flex items-center space-x-2">
+								<div className="h-3 w-3 animate-pulse rounded-full bg-red-500" />
+								<span className="font-mono text-lg font-bold">
+									{formatTime(recordingTime)}
+								</span>
+							</div>
+						)}
 					</div>
-				)}
-			</div>
 
-			{/* Botão de gravação */}
-			<div className="flex items-center justify-between">
-				<div className="flex items-center space-x-2">
-					<Button
-						variant={isRecording ? "destructive" : "default"}
-						size="lg"
-						onClick={isRecording ? handleStopRecording : handleStartRecording}
-						disabled={
-							isLoading ||
-							!selectedSourceId ||
-							!selectedSaveLocation ||
-							countdown !== null
-						}
-					>
-						{isLoading ? (
-							<>
-								<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-								{isRecording ? "Parando..." : "Iniciando..."}
-							</>
-						) : isRecording ? (
-							<>
-								<Square className="mr-2 h-4 w-4" />
-								Parar Gravação
-							</>
-						) : (
-							<>
-								<Play className="mr-2 h-4 w-4" />
-								Iniciar Gravação
-							</>
-						)}
-					</Button>
-				</div>
-			</div>
-
-			{/* Camera Overlay Option */}
-			{!isRecording && (
-				<div className="bg-muted/50 flex items-center justify-between rounded-xl p-4 backdrop-blur-sm">
-					<div className="flex items-center space-x-3">
-						{includeCameraOverlay && cameraEnabled ? (
-							<Camera className="h-4 w-4 text-green-600" />
-						) : (
-							<CameraOff className="h-4 w-4 text-gray-400" />
-						)}
-						<div className="flex flex-col">
-							<Label htmlFor="camera-overlay" className="text-sm font-medium">
-								Incluir câmera na gravação
-							</Label>
-							<span className="text-muted-foreground text-xs">
-								{cameraEnabled
-									? "Câmera será sobreposta ao vídeo"
-									: "Habilite a câmera primeiro"}
-							</span>
-						</div>
-					</div>
-					<Switch
-						id="camera-overlay"
-						checked={includeCameraOverlay}
-						onCheckedChange={setIncludeCameraOverlay}
-						disabled={!cameraEnabled}
-					/>
-				</div>
-			)}
-
-			{/* Microphone Option */}
-			{!isRecording && (
-				<div className="bg-muted/50 flex items-center justify-between rounded-xl p-4 backdrop-blur-sm">
-					<div className="flex items-center space-x-3">
-						{includeMicrophone && microphoneEnabled ? (
-							<Mic className="h-4 w-4 text-green-600" />
-						) : (
-							<MicOff className="h-4 w-4 text-gray-400" />
-						)}
-						<div className="flex flex-col">
-							<Label
-								htmlFor="microphone-overlay"
-								className="text-sm font-medium"
+					{/* Botão de gravação */}
+					<div className="flex items-center justify-between">
+						<div className="flex items-center space-x-2">
+							<Button
+								variant={isRecording ? "destructive" : "default"}
+								size="lg"
+								onClick={
+									isRecording ? handleStopRecording : handleStartRecording
+								}
+								disabled={
+									isLoading ||
+									!selectedSourceId ||
+									!selectedSaveLocation ||
+									countdown !== null
+								}
 							>
-								Incluir microfone na gravação
-							</Label>
-							<span className="text-muted-foreground text-xs">
-								{microphoneEnabled
-									? "Áudio do microfone será incluído no vídeo"
-									: "Habilite o microfone primeiro"}
-							</span>
+								{isLoading ? (
+									<>
+										<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+										{isRecording ? "Parando..." : "Iniciando..."}
+									</>
+								) : isRecording ? (
+									<>
+										<Square className="mr-2 h-4 w-4" />
+										Parar Gravação
+									</>
+								) : (
+									<>
+										<Play className="mr-2 h-4 w-4" />
+										Iniciar Gravação
+									</>
+								)}
+							</Button>
 						</div>
 					</div>
-					<Switch
-						id="microphone-overlay"
-						checked={includeMicrophone}
-						onCheckedChange={setIncludeMicrophone}
-						disabled={!microphoneEnabled}
-					/>
-				</div>
-			)}
 
-			{/* Header Option */}
-			{!isRecording && (
-				<div className="bg-muted/50 flex items-center justify-between rounded-xl p-4 backdrop-blur-sm">
-					<div className="flex items-center space-x-3">
-						<FileText
-							className={`h-4 w-4 ${includeHeader && headerConfig.isEnabled ? "text-blue-600" : "text-gray-400"}`}
-						/>
-						<div className="flex flex-col">
-							<Label htmlFor="header-overlay" className="text-sm font-medium">
-								Incluir header informativo
-							</Label>
-							<span className="text-muted-foreground text-xs">
-								{headerConfig.isEnabled
-									? "Header será adicionado na parte superior do vídeo"
-									: "Configure o header nas configurações"}
-							</span>
+					{/* Camera Overlay Option */}
+					{!isRecording && (
+						<div className="bg-muted/50 flex items-center justify-between rounded-xl p-4 backdrop-blur-sm">
+							<div className="flex items-center space-x-3">
+								{includeCameraOverlay && cameraEnabled ? (
+									<Camera className="h-4 w-4 text-green-600" />
+								) : (
+									<CameraOff className="h-4 w-4 text-gray-400" />
+								)}
+								<div className="flex flex-col">
+									<Label
+										htmlFor="camera-overlay"
+										className="text-sm font-medium"
+									>
+										Incluir câmera na gravação
+									</Label>
+									<span className="text-muted-foreground text-xs">
+										{cameraEnabled
+											? "Câmera será sobreposta ao vídeo"
+											: "Habilite a câmera primeiro"}
+									</span>
+								</div>
+							</div>
+							<Switch
+								id="camera-overlay"
+								checked={includeCameraOverlay}
+								onCheckedChange={setIncludeCameraOverlay}
+								disabled={!cameraEnabled}
+							/>
 						</div>
-					</div>
-					<Switch
-						id="header-overlay"
-						checked={includeHeader}
-						onCheckedChange={setIncludeHeader}
-						disabled={!headerConfig.isEnabled}
-					/>
-				</div>
-			)}
+					)}
 
-			{(!selectedSourceId || !selectedSaveLocation) && (
-				<div className="rounded-xl border border-orange-200 bg-orange-50 p-5 dark:border-orange-800 dark:bg-orange-900/20">
-					<div className="space-y-2">
-						{!selectedSourceId && (
-							<p className="text-sm text-orange-800 dark:text-orange-200">
-								⚠️ Selecione uma fonte de captura antes de iniciar a gravação.
-							</p>
-						)}
-						{!selectedSaveLocation && (
-							<p className="text-sm text-orange-800 dark:text-orange-200">
-								⚠️ Selecione um local para salvar o vídeo antes de iniciar a
-								gravação.
-							</p>
-						)}
-					</div>
+					{/* Microphone Option */}
+					{!isRecording && (
+						<div className="bg-muted/50 flex items-center justify-between rounded-xl p-4 backdrop-blur-sm">
+							<div className="flex items-center space-x-3">
+								{includeMicrophone && microphoneEnabled ? (
+									<Mic className="h-4 w-4 text-green-600" />
+								) : (
+									<MicOff className="h-4 w-4 text-gray-400" />
+								)}
+								<div className="flex flex-col">
+									<Label
+										htmlFor="microphone-overlay"
+										className="text-sm font-medium"
+									>
+										Incluir microfone na gravação
+									</Label>
+									<span className="text-muted-foreground text-xs">
+										{microphoneEnabled
+											? "Áudio do microfone será incluído no vídeo"
+											: "Habilite o microfone primeiro"}
+									</span>
+								</div>
+							</div>
+							<Switch
+								id="microphone-overlay"
+								checked={includeMicrophone}
+								onCheckedChange={setIncludeMicrophone}
+								disabled={!microphoneEnabled}
+							/>
+						</div>
+					)}
+
+					{/* Header Option */}
+					{!isRecording && (
+						<div className="bg-muted/50 flex items-center justify-between rounded-xl p-4 backdrop-blur-sm">
+							<div className="flex items-center space-x-3">
+								<FileText
+									className={`h-4 w-4 ${includeHeader && headerConfig.isEnabled ? "text-blue-600" : "text-gray-400"}`}
+								/>
+								<div className="flex flex-col">
+									<Label
+										htmlFor="header-overlay"
+										className="text-sm font-medium"
+									>
+										Incluir header informativo
+									</Label>
+									<span className="text-muted-foreground text-xs">
+										{headerConfig.isEnabled
+											? "Header será adicionado na parte superior do vídeo"
+											: "Configure o header nas configurações"}
+									</span>
+								</div>
+							</div>
+							<Switch
+								id="header-overlay"
+								checked={includeHeader}
+								onCheckedChange={setIncludeHeader}
+								disabled={!headerConfig.isEnabled}
+							/>
+						</div>
+					)}
+
+					{(!selectedSourceId || !selectedSaveLocation) && (
+						<div className="rounded-xl border border-orange-200 bg-orange-50 p-5 dark:border-orange-800 dark:bg-orange-900/20">
+							<div className="space-y-2">
+								{!selectedSourceId && (
+									<p className="text-sm text-orange-800 dark:text-orange-200">
+										⚠️ Selecione uma fonte de captura antes de iniciar a
+										gravação.
+									</p>
+								)}
+								{!selectedSaveLocation && (
+									<p className="text-sm text-orange-800 dark:text-orange-200">
+										⚠️ Selecione um local para salvar o vídeo antes de iniciar a
+										gravação.
+									</p>
+								)}
+							</div>
+						</div>
+					)}
 				</div>
 			)}
-		</div>
+		</>
 	);
 }
