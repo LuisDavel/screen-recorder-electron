@@ -20,17 +20,10 @@ export function UnifiedFooter({
 
 	return (
 		<div
-			className={`bg-gray-900/95 text-white shadow-lg backdrop-blur-sm ${className}`}
+			className={`bg-gray-900/95 backdrop-blur-sm ${className}`}
 			style={{ height: `${footerConfig.height}px`, ...style }}
 		>
-			<div className="flex h-full items-center justify-center px-4 md:px-6">
-				{/* Espaço vazio - footer sem informações */}
-				<div className="w-full h-full flex items-center justify-center">
-					<div className="text-xs text-gray-400 opacity-30">
-						{/* Rodapé vazio */}
-					</div>
-				</div>
-			</div>
+			{/* Footer completamente vazio - sem texto ou informações */}
 		</div>
 	);
 }

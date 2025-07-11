@@ -42,27 +42,20 @@ export class VideoFooterComposer {
 			footerConfig: this.config,
 			inputStreamTracks: inputStream.getTracks().length,
 			audioTracks: inputStream.getAudioTracks().length,
+			overlayMode: "Footer será sobreposto ao vídeo 100%",
 		});
 
-		if (!this.config.isEnabled) {
-			console.log("Footer disabled, returning original stream");
-			return inputStream;
-		}
-
-		// Set canvas dimensions to include footer height (composition mode)
+		// Set canvas dimensions to match original video (overlay mode)
 		this.canvas.width = width;
-		this.canvas.height = height + this.config.height;
+		this.canvas.height = height;
 
 		console.log("VideoFooterComposer: Canvas configurado", {
 			canvasWidth: this.canvas.width,
 			canvasHeight: this.canvas.height,
-			footerHeight: this.config.height,
-			mode: "composition",
 		});
 
 		// Set video source
 		this.video.srcObject = inputStream;
-
 		await this.video.play();
 
 		// Wait for video metadata to load to get accurate dimensions
@@ -83,12 +76,22 @@ export class VideoFooterComposer {
 			videoDimensions: {
 				width: this.video.videoWidth,
 				height: this.video.videoHeight,
+				aspectRatio: (this.video.videoWidth / this.video.videoHeight).toFixed(
+					3,
+				),
 			},
 			canvasDimensions: {
 				width: this.canvas.width,
 				height: this.canvas.height,
+				aspectRatio: (this.canvas.width / this.canvas.height).toFixed(3),
 			},
+			isSequentialComposition: "Footer aplicado após Header",
+			forcingFullCoverage: "100% - footer como overlay",
 		});
+
+		// Canvas mantém dimensões originais - footer sobrepõe o vídeo
+		// IMPORTANTE: Não chamar adjustCanvasToVideoAspectRatio() para manter 100% coverage
+		// this.adjustCanvasToVideoAspectRatio();
 
 		// Start composition loop
 		this.startComposition();
@@ -118,7 +121,7 @@ export class VideoFooterComposer {
 				console.log(
 					"VideoFooterComposer: Footer desabilitado, desenhando apenas vídeo",
 				);
-				// If footer is disabled, just draw the video
+				// If footer is disabled, draw the video filling 100% of canvas
 				this.ctx.drawImage(
 					this.video,
 					0,
@@ -131,68 +134,29 @@ export class VideoFooterComposer {
 				this.ctx.fillStyle = "#000000";
 				this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-				// Calculate aspect ratio preserving dimensions
+				// Get video dimensions for logging
 				const videoWidth = this.video.videoWidth || this.canvas.width;
 				const videoHeight = this.video.videoHeight || this.canvas.height;
-				const videoAspectRatio = videoWidth / videoHeight;
 
-				// Debug: log das dimensões para detectar problemas (uma vez só)
+				// Verificação uma vez só para detectar problemas
 				if (!this.dimensionsLogged) {
-					const videoAreaWidth = this.canvas.width;
-					const videoAreaHeight = this.canvas.height - this.config.height;
-					const videoAreaAspectRatio = videoAreaWidth / videoAreaHeight;
-					const aspectRatioDiff = Math.abs(
-						videoAreaAspectRatio - videoAspectRatio,
-					);
-
-					console.log("🎬 FooterComposer renderização (composition mode):", {
-						canvasTotal: `${this.canvas.width}x${this.canvas.height}`,
-						videoOriginal: `${videoWidth}x${videoHeight}`,
-						videoArea: `${videoAreaWidth}x${videoAreaHeight}`,
+					console.log("🎬 FooterComposer renderização (100% coverage):", {
+						canvas: `${this.canvas.width}x${this.canvas.height}`,
+						video: `${videoWidth}x${videoHeight}`,
 						footerHeight: this.config.height,
-						aspectRatios: {
-							videoArea: videoAreaAspectRatio.toFixed(3),
-							video: videoAspectRatio.toFixed(3),
-						},
-						distorção: aspectRatioDiff > 0.01 ? "⚠️ SIM" : "✅ NÃO",
+						mode: "fill 100% of canvas",
 					});
 
 					this.dimensionsLogged = true;
 				}
 
-				// Calculate video area (canvas minus footer space)
-				const videoAreaWidth = this.canvas.width;
-				const videoAreaHeight = this.canvas.height - this.config.height;
-				const videoAreaY = 0; // Start at top
+				// Fill entire canvas with video (100% coverage)
+				const drawWidth = this.canvas.width;
+				const drawHeight = this.canvas.height;
+				const drawX = 0;
+				const drawY = 0;
 
-				// Calculate aspect ratio preserving dimensions for video area
-				const videoAreaAspectRatio = videoAreaWidth / videoAreaHeight;
-
-				let drawWidth = videoAreaWidth;
-				let drawHeight = videoAreaHeight;
-				let drawX = 0;
-				let drawY = videoAreaY;
-
-				// Maintain aspect ratio - fit video to available area (above footer)
-				if (videoAspectRatio > videoAreaAspectRatio) {
-					// Video is wider than available area
-					drawHeight = videoAreaWidth / videoAspectRatio;
-					drawY = videoAreaY + (videoAreaHeight - drawHeight) / 2;
-				} else {
-					// Video is taller than available area
-					drawWidth = videoAreaHeight * videoAspectRatio;
-					drawX = (videoAreaWidth - drawWidth) / 2;
-				}
-
-				// Ensure footer position doesn't exceed canvas bounds
-				const footerBottomY = drawY + drawHeight + this.config.height;
-				if (footerBottomY > this.canvas.height) {
-					// Adjust video position to make room for footer
-					const adjustment = footerBottomY - this.canvas.height;
-					drawY = Math.max(0, drawY - adjustment);
-				}
-
-				// Draw video maintaining aspect ratio in the area above footer
+				// Draw video filling 100% of the canvas
 				this.ctx.drawImage(
 					this.video,
 					0,
@@ -205,28 +169,25 @@ export class VideoFooterComposer {
 					drawHeight, // destination height
 				);
 
-				// Draw footer at bottom, centered on canvas
-				const footerY = this.canvas.height - this.config.height;
-				const footerWidth = Math.min(drawWidth, this.canvas.width);
-				const footerX = (this.canvas.width - footerWidth) / 2;
-
-				// Draw footer background (centered)
-				this.ctx.fillStyle = "rgba(17, 24, 39, 0.95)"; // Same color as header top
-				this.ctx.fillRect(footerX, footerY, footerWidth, this.config.height);
-
-				// Add subtle border at top of footer
-				this.ctx.strokeStyle = "rgba(107, 114, 128, 0.5)";
-				this.ctx.lineWidth = 1;
-				this.ctx.beginPath();
-				this.ctx.moveTo(footerX, footerY);
-				this.ctx.lineTo(footerX + footerWidth, footerY);
-				this.ctx.stroke();
+				// Draw footer overlay at the bottom
+				this.drawFooter();
 			}
 
 			this.animationFrameId = requestAnimationFrame(draw);
 		};
 
 		draw();
+	}
+
+	private drawFooter() {
+		const footerHeight = this.config.height;
+		const footerY = this.canvas.height - footerHeight;
+
+		// Draw footer background at bottom - just a simple bar, no text
+		this.ctx.fillStyle = "rgba(17, 24, 39, 0.9)"; // gray-900 with opacity
+		this.ctx.fillRect(0, footerY, this.canvas.width, footerHeight);
+
+		// No text or information - just a simple footer bar
 	}
 
 	public stop(): void {
@@ -253,5 +214,20 @@ export class VideoFooterComposer {
 
 	public updateFooterConfig(newConfig: FooterConfig) {
 		this.config = newConfig;
+	}
+
+	// Método para verificar se o footer está funcionando corretamente
+	public debugFooterStatus() {
+		console.log("🔍 FooterComposer Debug Status:", {
+			canvasDimensions: `${this.canvas.width}x${this.canvas.height}`,
+			videoDimensions: this.video
+				? `${this.video.videoWidth}x${this.video.videoHeight}`
+				: "N/A",
+			videoReadyState: this.video ? this.video.readyState : "N/A",
+			footerEnabled: this.config.isEnabled,
+			footerHeight: this.config.height,
+			streamActive: this.stream ? this.stream.active : false,
+			isComposing: this.animationFrameId !== null,
+		});
 	}
 }

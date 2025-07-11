@@ -23,17 +23,10 @@ export function PreviewFooter({
 
 	return (
 		<div
-			className={`bg-gray-900/90 text-white shadow-lg backdrop-blur-sm border-t border-gray-700/50 z-0 ${className}`}
+			className={`bg-gray-900/90 backdrop-blur-sm border-t border-gray-700/50 z-0 ${className}`}
 			style={{ height: `${previewHeight}px`, ...style }}
 		>
-			<div className="flex h-full items-center justify-center px-3 md:px-4">
-				{/* Espaço vazio - footer sem informações */}
-				<div className="w-full h-full flex items-center justify-center">
-					<div className="text-xs text-gray-400 opacity-50">
-						{/* Rodapé vazio */}
-					</div>
-				</div>
-			</div>
+			{/* Footer completamente vazio - sem texto ou informações */}
 		</div>
 	);
 }

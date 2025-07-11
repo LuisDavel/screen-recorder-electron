@@ -42,9 +42,9 @@ export class VideoHeaderComposer {
 			audioTracks: sourceStream.getAudioTracks().length,
 		});
 
-		// Set canvas dimensions to include header height (composition mode)
+		// Set canvas dimensions to match original video (overlay mode)
 		this.canvas.width = width;
-		this.canvas.height = height + this.headerConfig.height;
+		this.canvas.height = height;
 
 		console.log("VideoHeaderComposer: Canvas configurado", {
 			canvasWidth: this.canvas.width,
@@ -168,7 +168,7 @@ export class VideoHeaderComposer {
 				console.log(
 					"VideoHeaderComposer: Header desabilitado, desenhando apenas vídeo",
 				);
-				// If header is disabled, just draw the video
+				// If header is disabled, draw the video filling 100% of canvas
 				this.ctx.drawImage(
 					this.video,
 					0,
@@ -181,61 +181,29 @@ export class VideoHeaderComposer {
 				this.ctx.fillStyle = "#000000";
 				this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-				// Debug: log das dimensões
+				// Get video dimensions for logging
 				const videoWidth = this.video.videoWidth || this.canvas.width;
 				const videoHeight = this.video.videoHeight || this.canvas.height;
 
 				// Verificação uma vez só para detectar problemas
 				if (!this.dimensionsLogged) {
-					const videoAreaWidth = this.canvas.width;
-					const videoAreaHeight = this.canvas.height - this.headerConfig.height;
-					const videoAreaAspectRatio = videoAreaWidth / videoAreaHeight;
-					const videoAspectRatio = videoWidth / videoHeight;
-					const aspectRatioDiff = Math.abs(
-						videoAreaAspectRatio - videoAspectRatio,
-					);
-
-					console.log("🎬 HeaderComposer renderização (composition mode):", {
-						canvasTotal: `${this.canvas.width}x${this.canvas.height}`,
-						videoOriginal: `${videoWidth}x${videoHeight}`,
-						videoArea: `${videoAreaWidth}x${videoAreaHeight}`,
+					console.log("🎬 HeaderComposer renderização (100% coverage):", {
+						canvas: `${this.canvas.width}x${this.canvas.height}`,
+						video: `${videoWidth}x${videoHeight}`,
 						headerHeight: this.headerConfig.height,
-						aspectRatios: {
-							videoArea: videoAreaAspectRatio.toFixed(3),
-							video: videoAspectRatio.toFixed(3),
-						},
-						distorção: aspectRatioDiff > 0.01 ? "⚠️ SIM" : "✅ NÃO",
+						mode: "fill 100% of canvas",
 					});
 
 					this.dimensionsLogged = true;
 				}
 
-				// Calculate video area (canvas minus header space)
-				const videoAreaWidth = this.canvas.width;
-				const videoAreaHeight = this.canvas.height - this.headerConfig.height;
-				const videoAreaY = this.headerConfig.height; // Start below header
+				// Fill entire canvas with video (100% coverage)
+				const drawWidth = this.canvas.width;
+				const drawHeight = this.canvas.height;
+				const drawX = 0;
+				const drawY = 0;
 
-				// Calculate aspect ratio preserving dimensions for video area
-				const videoAreaAspectRatio = videoAreaWidth / videoAreaHeight;
-				const videoAspectRatio = videoWidth / videoHeight;
-
-				let drawWidth = videoAreaWidth;
-				let drawHeight = videoAreaHeight;
-				let drawX = 0;
-				let drawY = videoAreaY;
-
-				// Maintain aspect ratio - fit video to available area (below header)
-				if (videoAspectRatio > videoAreaAspectRatio) {
-					// Video is wider than available area
-					drawHeight = videoAreaWidth / videoAspectRatio;
-					drawY = videoAreaY + (videoAreaHeight - drawHeight) / 2;
-				} else {
-					// Video is taller than available area
-					drawWidth = videoAreaHeight * videoAspectRatio;
-					drawX = (videoAreaWidth - drawWidth) / 2;
-				}
-
-				// Draw video maintaining aspect ratio in the area below header
+				// Draw video filling 100% of the canvas
 				this.ctx.drawImage(
 					this.video,
 					0,
@@ -248,7 +216,7 @@ export class VideoHeaderComposer {
 					drawHeight, // destination height
 				);
 
-				// Draw header at the top
+				// Draw header overlay at the top
 				this.drawHeader();
 			}
 
@@ -271,45 +239,22 @@ export class VideoHeaderComposer {
 
 		const padding = 24;
 		const columnWidth = this.canvas.width / 12;
-		let y = headerHeight / 2;
 
-		// If height allows for two rows
-		if (headerHeight > 60) {
-			y = headerHeight / 3;
-		}
-
-		// Draw main information row
+		// First row - main information
+		let y = headerHeight / 4;
 		this.drawTextColumn(
 			"Exame",
 			this.headerConfig.examName || "Não informado",
 			0,
 			y,
-			3,
+			4,
 			columnWidth,
 			padding,
 		);
 		this.drawTextColumn(
 			"Data",
 			this.formatDate(this.headerConfig.examDate) || "Não informada",
-			3,
-			y,
-			2,
-			columnWidth,
-			padding,
-		);
-		this.drawTextColumn(
-			"Paciente",
-			this.headerConfig.patientName || "Não informado",
-			5,
-			y,
-			3,
-			columnWidth,
-			padding,
-		);
-		this.drawTextColumn(
-			"Sexo / Idade",
-			this.getSexAge(),
-			8,
+			4,
 			y,
 			2,
 			columnWidth,
@@ -318,53 +263,76 @@ export class VideoHeaderComposer {
 		this.drawTextColumn(
 			"ID",
 			this.headerConfig.externalId || "Não informado",
-			10,
+			6,
 			y,
 			2,
 			columnWidth,
 			padding,
 		);
 
-		// Draw second row if height allows
-		if (headerHeight > 60) {
-			y = (headerHeight * 2) / 3;
+		// Second row - patient information
+		y = (headerHeight * 2) / 4;
+		this.drawTextColumn(
+			"Paciente",
+			this.headerConfig.patientName || "Não informado",
+			0,
+			y,
+			4,
+			columnWidth,
+			padding,
+		);
+		this.drawTextColumn(
+			"Sexo",
+			this.headerConfig.patientSex || "Não informado",
+			4,
+			y,
+			2,
+			columnWidth,
+			padding,
+		);
+		this.drawTextColumn(
+			"Idade",
+			this.headerConfig.patientAge || "Não informado",
+			6,
+			y,
+			2,
+			columnWidth,
+			padding,
+		);
 
-			// Smaller font for second row
-			this.ctx.font = "11px system-ui, -apple-system, sans-serif";
+		// Third row - medical information
+		y = (headerHeight * 3) / 4;
+		this.ctx.font = "11px system-ui, -apple-system, sans-serif";
 
-			// Institution
-			this.drawInlineInfo(
-				"Instituição:",
-				this.headerConfig.institutionName || "Não informada",
-				0,
-				y,
-				4,
-				columnWidth,
-				padding,
-			);
+		this.drawInlineInfo(
+			"Instituição:",
+			this.headerConfig.institutionName || "Não informada",
+			0,
+			y,
+			4,
+			columnWidth,
+			padding,
+		);
 
-			// Doctor
-			this.drawInlineInfo(
-				"Médico:",
-				this.headerConfig.requestingDoctor || "Não informado",
-				4,
-				y,
-				4,
-				columnWidth,
-				padding,
-			);
+		this.drawInlineInfo(
+			"Médico:",
+			this.headerConfig.requestingDoctor || "Não informado",
+			4,
+			y,
+			3,
+			columnWidth,
+			padding,
+		);
 
-			// CRM
-			this.drawInlineInfo(
-				"CRM:",
-				this.headerConfig.crm || "Não informado",
-				8,
-				y,
-				4,
-				columnWidth,
-				padding,
-			);
-		}
+		this.drawInlineInfo(
+			"CRM:",
+			this.headerConfig.crm || "Não informado",
+			7,
+			y,
+			2,
+			columnWidth,
+			padding,
+		);
 	}
 
 	private drawTextColumn(
@@ -434,17 +402,6 @@ export class VideoHeaderComposer {
 		}
 
 		return truncated + "...";
-	}
-
-	private getSexAge(): string {
-		if (this.headerConfig.patientSex && this.headerConfig.patientAge) {
-			return `${this.headerConfig.patientSex} / ${this.headerConfig.patientAge}`;
-		}
-		return (
-			this.headerConfig.patientSex ||
-			this.headerConfig.patientAge ||
-			"Não informado"
-		);
 	}
 
 	private formatDate(dateString: string): string {

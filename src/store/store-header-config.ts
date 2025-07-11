@@ -31,7 +31,7 @@ interface HeaderConfigStore {
 
 const defaultHeaderConfig: HeaderConfig = {
 	isEnabled: true,
-	height: 80,
+	height: 120, // Aumentado de 80 para 120px
 	examName: "Ultrassonografia Abdominal",
 	examDate: "2025-07-05",
 	patientName: "Nome completo do paciente",
@@ -44,8 +44,8 @@ const defaultHeaderConfig: HeaderConfig = {
 };
 
 const defaultFooterConfig: FooterConfig = {
-	isEnabled: false,
-	height: 40,
+	isEnabled: true, // Habilitado por padrão
+	height: 30, // Diminuído de 40 para 30px
 };
 
 export const useHeaderConfigStore = create<HeaderConfigStore>()(

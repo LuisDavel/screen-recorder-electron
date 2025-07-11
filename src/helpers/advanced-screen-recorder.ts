@@ -341,44 +341,26 @@ export class AdvancedScreenRecorderManager {
 				let width: number;
 				let height: number;
 
-				if (this.headerComposer) {
-					// If header was applied, use the original video dimensions (footer will add to header height)
-					if (this.videoComposer) {
-						const composerSettings = this.videoComposer.getSettings();
-						width = composerSettings.outputWidth;
-						height = composerSettings.outputHeight;
-					} else {
-						const screenTrack = this.screenStream?.getVideoTracks()[0];
-						const screenSettings = screenTrack?.getSettings();
-						width = screenSettings?.width || 1920;
-						height = screenSettings?.height || 1080;
-					}
-					console.log(
-						"Header já aplicado, usando dimensões originais do vídeo para footer:",
-						{
-							width,
-							height,
-						},
-					);
+				// Use the same dimensions logic as the header (overlay mode)
+				if (this.videoComposer) {
+					// If we have a video composer, use its output dimensions
+					const composerSettings = this.videoComposer.getSettings();
+					width = composerSettings.outputWidth;
+					height = composerSettings.outputHeight;
+					console.log("Usando dimensões do VideoComposer para footer:", {
+						width,
+						height,
+					});
 				} else {
-					// No header applied, use video composer or original screen dimensions
-					if (this.videoComposer) {
-						const composerSettings = this.videoComposer.getSettings();
-						width = composerSettings.outputWidth;
-						height = composerSettings.outputHeight;
-					} else {
-						const screenTrack = this.screenStream?.getVideoTracks()[0];
-						const screenSettings = screenTrack?.getSettings();
-						width = screenSettings?.width || 1920;
-						height = screenSettings?.height || 1080;
-					}
-					console.log(
-						"Nenhum header aplicado, usando dimensões originais para footer:",
-						{
-							width,
-							height,
-						},
-					);
+					// Otherwise, get from the original screen stream
+					const screenTrack = this.screenStream?.getVideoTracks()[0];
+					const screenSettings = screenTrack?.getSettings();
+					width = screenSettings?.width || 1920;
+					height = screenSettings?.height || 1080;
+					console.log("Usando dimensões da tela original para footer:", {
+						width,
+						height,
+					});
 				}
 
 				console.log("Dimensões finais do vídeo para footer:", {

@@ -326,8 +326,7 @@ export class VideoComposer {
 			// Limpar canvas
 			this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-			// Desenhar tela de fundo ocupando todo o canvas (forçando esticamento)
-			// Agora o vídeo da tela ocupa todo o espaço disponível
+			// Desenhar tela de fundo ocupando todo o canvas (100% coverage)
 			if (this.screenVideo.readyState >= 2) {
 				// Debug: log das dimensões
 				const videoWidth = this.screenVideo.videoWidth || this.canvas.width;
@@ -341,21 +340,22 @@ export class VideoComposer {
 						canvasAspectRatio - videoAspectRatio,
 					);
 
-					console.log("🎥 VideoComposer renderização:", {
+					console.log("🎥 VideoComposer renderização (100% coverage):", {
 						canvas: `${this.canvas.width}x${this.canvas.height}`,
 						video: `${videoWidth}x${videoHeight}`,
 						aspectRatios: {
 							canvas: canvasAspectRatio.toFixed(3),
 							video: videoAspectRatio.toFixed(3),
 						},
+						mode: "Fill 100% of canvas",
 						distorção: aspectRatioDiff > 0.01 ? "⚠️ SIM" : "✅ NÃO",
 					});
 
 					this.dimensionsLogged = true;
 				}
 
-				// Desenhar vídeo preservando aspect ratio original (sem crop/fill forçado)
-				// Como o canvas já tem as dimensões exatas do vídeo, desenhar diretamente
+				// Desenhar vídeo preenchendo COMPLETAMENTE o canvas (100% coverage)
+				// Garantir que o vídeo ocupe todo o espaço disponível
 				this.ctx.drawImage(
 					this.screenVideo,
 					0,
@@ -364,8 +364,8 @@ export class VideoComposer {
 					videoHeight, // source width, height (usar vídeo completo)
 					0,
 					0, // destination x, y
-					this.canvas.width, // destination width
-					this.canvas.height, // destination height
+					this.canvas.width, // destination width - preencher completamente
+					this.canvas.height, // destination height - preencher completamente
 				);
 			}
 
@@ -705,21 +705,33 @@ export class VideoComposer {
 			canvasAspectRatio: canvasAspectRatio.toFixed(3),
 		});
 
-		// SEMPRE usar as dimensões exatas do vídeo para evitar achatamento
-		let adjustedWidth = videoWidth;
-		let adjustedHeight = videoHeight;
+		// NOVA ESTRATÉGIA: Forçar o vídeo a ocupar 100% da altura disponível
+		// Calcular a largura necessária para manter o aspect ratio do vídeo
+		let adjustedWidth: number;
+		let adjustedHeight: number;
+
+		// Se o vídeo é mais largo que o canvas padrão, ajustar para preencher completamente
+		if (videoAspectRatio > canvasAspectRatio) {
+			// Vídeo é mais largo - usar largura máxima e calcular altura proporcional
+			adjustedWidth = Math.max(videoWidth, this.canvas.width);
+			adjustedHeight = Math.round(adjustedWidth / videoAspectRatio);
+		} else {
+			// Vídeo é mais alto - usar altura máxima e calcular largura proporcional
+			adjustedHeight = Math.max(videoHeight, this.canvas.height);
+			adjustedWidth = Math.round(adjustedHeight * videoAspectRatio);
+		}
 
 		// Garantir que sejam pares (requirement para codecs)
 		adjustedWidth = Math.round(adjustedWidth / 2) * 2;
 		adjustedHeight = Math.round(adjustedHeight / 2) * 2;
 
-		console.log("🔧 Usando dimensões exatas do vídeo (SEM correção forçada):", {
+		console.log("🔧 FORÇANDO vídeo a ocupar 100% da altura disponível:", {
 			original: `${this.canvas.width}x${this.canvas.height}`,
 			adjusted: `${adjustedWidth}x${adjustedHeight}`,
 			originalAspectRatio: canvasAspectRatio.toFixed(3),
 			newAspectRatio: (adjustedWidth / adjustedHeight).toFixed(3),
 			videoAspectRatio: videoAspectRatio.toFixed(3),
-			preservandoAspectRatio: "SIM - usando dimensões exatas do vídeo",
+			strategy: "Maximizar aproveitamento do espaço disponível",
 		});
 
 		this.canvas.width = adjustedWidth;
@@ -728,7 +740,7 @@ export class VideoComposer {
 		this.options.outputHeight = adjustedHeight;
 
 		console.log(
-			"✅ Canvas ajustado para dimensões exatas do vídeo:",
+			"✅ Canvas ajustado para maximizar aproveitamento do espaço:",
 			`${this.canvas.width}x${this.canvas.height}`,
 		);
 	}
