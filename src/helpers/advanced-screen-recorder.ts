@@ -89,7 +89,13 @@ export class AdvancedScreenRecorderManager {
 			const videoTrack = stream.getVideoTracks()[0];
 			const settings = videoTrack.getSettings();
 
+			// Detectar se é captura de tela completa (sem foco de aplicação)
+			const isFullScreenCapture =
+				sourceId.includes("screen:") ||
+				(settings.width && settings.height && settings.width > 2000);
+
 			console.log("Stream da tela obtido com sucesso", {
+				sourceId,
 				tracks: stream.getTracks().length,
 				videoTracks: stream.getVideoTracks().length,
 				resolution: `${settings.width}x${settings.height}`,
@@ -98,7 +104,28 @@ export class AdvancedScreenRecorderManager {
 						? (settings.width / settings.height).toFixed(2)
 						: "unknown",
 				frameRate: settings.frameRate,
+				isFullScreenCapture,
+				isUltrawide:
+					settings.width && settings.height
+						? settings.width / settings.height > 2.0
+						: false,
 			});
+
+			// Se for captura de tela completa e detectarmos aspect ratio incorreto, alertar
+			if (isFullScreenCapture && settings.width && settings.height) {
+				const aspectRatio = settings.width / settings.height;
+				if (aspectRatio < 2.0 && settings.width > 2000) {
+					console.warn(
+						"⚠️ DETECÇÃO: Possível problema com captura de tela ultrawide",
+						{
+							dimensõesCapturadas: `${settings.width}x${settings.height}`,
+							aspectRatioDetectado: aspectRatio.toFixed(3),
+							expectedUltrawide: "~2.35",
+							recomendação: "Forçar correção de aspect ratio",
+						},
+					);
+				}
+			}
 
 			return stream;
 		} catch (error) {
