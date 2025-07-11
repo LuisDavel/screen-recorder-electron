@@ -27,8 +27,7 @@ export class VideoHeaderComposer {
 		height: number,
 	): Promise<MediaStream> {
 		console.log("VideoHeaderComposer: Iniciando composição com header", {
-			width,
-			height,
+			requestedDimensions: { width, height },
 			headerConfig: this.headerConfig,
 			sourceStreamTracks: sourceStream.getTracks().length,
 			audioTracks: sourceStream.getAudioTracks().length,
@@ -47,7 +46,34 @@ export class VideoHeaderComposer {
 		this.video.srcObject = sourceStream;
 		await this.video.play();
 
-		console.log("VideoHeaderComposer: Vídeo fonte configurado e reproduzindo");
+		// Wait for video metadata to load to get accurate dimensions
+		if (this.video.videoWidth === 0 || this.video.videoHeight === 0) {
+			await new Promise<void>((resolve) => {
+				const checkDimensions = () => {
+					if (this.video.videoWidth > 0 && this.video.videoHeight > 0) {
+						resolve();
+					} else {
+						setTimeout(checkDimensions, 10);
+					}
+				};
+				checkDimensions();
+			});
+		}
+
+		console.log("VideoHeaderComposer: Vídeo fonte configurado e reproduzindo", {
+			videoDimensions: {
+				width: this.video.videoWidth,
+				height: this.video.videoHeight,
+				aspectRatio: (this.video.videoWidth / this.video.videoHeight).toFixed(
+					3,
+				),
+			},
+			canvasDimensions: {
+				width: this.canvas.width,
+				height: this.canvas.height,
+				aspectRatio: (this.canvas.width / this.canvas.height).toFixed(3),
+			},
+		});
 
 		// Start composition loop
 		this.startComposition();
@@ -90,32 +116,66 @@ export class VideoHeaderComposer {
 				this.ctx.fillStyle = "#000000";
 				this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-				// Calculate video position with header at top
+				// Calculate video position with header at top, preserving aspect ratio
 				const headerHeight = this.headerConfig.height;
-				const videoY = headerHeight;
-				const videoHeight = this.canvas.height - headerHeight;
+				const availableHeight = this.canvas.height - headerHeight;
+				const availableWidth = this.canvas.width;
 
-				console.log("VideoHeaderComposer: Desenhando vídeo com header", {
-					headerHeight,
-					videoY,
-					videoHeight,
-					videoSize: {
-						width: this.video.videoWidth,
-						height: this.video.videoHeight,
+				// Get video dimensions
+				const videoWidth = this.video.videoWidth || this.canvas.width;
+				const videoHeight = this.video.videoHeight || this.canvas.height;
+				const videoAspectRatio = videoWidth / videoHeight;
+				const availableAspectRatio = availableWidth / availableHeight;
+
+				let drawWidth: number;
+				let drawHeight: number;
+				let drawX: number;
+				let drawY: number;
+
+				// Calculate dimensions to maintain aspect ratio
+				if (videoAspectRatio > availableAspectRatio) {
+					// Video is wider than available space - fit by width
+					drawWidth = availableWidth;
+					drawHeight = availableWidth / videoAspectRatio;
+					drawX = 0;
+					drawY = headerHeight + (availableHeight - drawHeight) / 2;
+				} else {
+					// Video is taller than available space - fit by height
+					drawWidth = availableHeight * videoAspectRatio;
+					drawHeight = availableHeight;
+					drawX = (availableWidth - drawWidth) / 2;
+					drawY = headerHeight;
+				}
+
+				console.log(
+					"VideoHeaderComposer: Desenhando vídeo com header (aspect ratio preservado)",
+					{
+						headerHeight,
+						availableWidth,
+						availableHeight,
+						videoSize: { width: videoWidth, height: videoHeight },
+						videoAspectRatio: videoAspectRatio.toFixed(3),
+						availableAspectRatio: availableAspectRatio.toFixed(3),
+						drawDimensions: {
+							x: Math.round(drawX),
+							y: Math.round(drawY),
+							width: Math.round(drawWidth),
+							height: Math.round(drawHeight),
+						},
 					},
-				});
+				);
 
-				// Draw video below header
+				// Draw video below header with preserved aspect ratio
 				this.ctx.drawImage(
 					this.video,
 					0,
 					0,
-					this.video.videoWidth,
-					this.video.videoHeight, // source
-					0,
-					videoY,
-					this.canvas.width,
-					videoHeight, // destination
+					videoWidth,
+					videoHeight, // source
+					drawX,
+					drawY,
+					drawWidth,
+					drawHeight, // destination
 				);
 
 				// Draw header

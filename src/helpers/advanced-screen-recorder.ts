@@ -75,13 +75,29 @@ export class AdvancedScreenRecorderManager {
 					mandatory: {
 						chromeMediaSource: "desktop",
 						chromeMediaSourceId: sourceId,
+						// Manter resolução original da tela
+						maxWidth: 4096,
+						maxHeight: 4096,
+						// Garantir qualidade máxima
+						minFrameRate: 30,
+						maxFrameRate: 60,
 					},
-				} as MediaTrackConstraints,
+				} as any,
 			});
+
+			// Obter dimensões reais da tela capturada
+			const videoTrack = stream.getVideoTracks()[0];
+			const settings = videoTrack.getSettings();
 
 			console.log("Stream da tela obtido com sucesso", {
 				tracks: stream.getTracks().length,
 				videoTracks: stream.getVideoTracks().length,
+				resolution: `${settings.width}x${settings.height}`,
+				aspectRatio:
+					settings.width && settings.height
+						? (settings.width / settings.height).toFixed(2)
+						: "unknown",
+				frameRate: settings.frameRate,
 			});
 
 			return stream;
@@ -211,13 +227,29 @@ export class AdvancedScreenRecorderManager {
 
 				this.headerComposer = new VideoHeaderComposer(options.headerConfig);
 
-				// Get video track settings for dimensions
-				const videoTrack = currentStream.getVideoTracks()[0];
-				const settings = videoTrack.getSettings();
-				const width = settings.width || 1920;
-				const height = settings.height || 1080;
+				// Get correct dimensions for header composition
+				let width: number;
+				let height: number;
 
-				console.log("Dimensões do vídeo para header:", { width, height });
+				if (this.videoComposer) {
+					// If we have a video composer, use its output dimensions
+					const composerSettings = this.videoComposer.getSettings();
+					width = composerSettings.outputWidth;
+					height = composerSettings.outputHeight;
+					console.log("Usando dimensões do VideoComposer:", { width, height });
+				} else {
+					// Otherwise, get from the original screen stream
+					const screenTrack = this.screenStream?.getVideoTracks()[0];
+					const screenSettings = screenTrack?.getSettings();
+					width = screenSettings?.width || 1920;
+					height = screenSettings?.height || 1080;
+					console.log("Usando dimensões da tela original:", { width, height });
+				}
+
+				console.log("Dimensões finais do vídeo para header:", {
+					width,
+					height,
+				});
 				console.log("Configurações do header:", options.headerConfig);
 
 				currentStream = await this.headerComposer.composeWithHeader(
@@ -631,8 +663,8 @@ export class AdvancedScreenRecorderManager {
 
 		const cameraStore = useCameraConfigStore.getState();
 		this.videoComposer.updateCameraSettings(
-			cameraStore.position,
-			cameraStore.size,
+			cameraStore.position as any,
+			cameraStore.size as any,
 		);
 
 		console.log("Configurações da câmera atualizadas durante gravação");
@@ -660,8 +692,9 @@ export class AdvancedScreenRecorderManager {
 			includeMicrophone: true,
 			includeHeader: false,
 			headerConfig: undefined,
-			outputWidth: 1920,
-			outputHeight: 1080,
+			// Remover configurações fixas de resolução - será detectado automaticamente
+			outputWidth: undefined,
+			outputHeight: undefined,
 			frameRate: 30,
 			videoBitrate: 2500000, // 2.5 Mbps
 		};
