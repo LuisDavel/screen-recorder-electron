@@ -1,13 +1,15 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export type VideoFormat = "webm" | "mp4";
+export type VideoFormat = "webm" | "mp4" | "whatsapp";
 
 export interface VideoFormatConfig {
 	format: VideoFormat;
 	codec: string;
 	bitrate?: number;
 	quality: "low" | "medium" | "high";
+	maxResolution?: { width: number; height: number };
+	targetFileSize?: number; // in MB
 }
 
 interface VideoFormatState {
@@ -15,12 +17,16 @@ interface VideoFormatState {
 	codec: string;
 	bitrate?: number;
 	quality: "low" | "medium" | "high";
+	maxResolution?: { width: number; height: number };
+	targetFileSize?: number;
 
 	// Actions
 	setFormat: (format: VideoFormat) => void;
 	setCodec: (codec: string) => void;
 	setBitrate: (bitrate?: number) => void;
 	setQuality: (quality: "low" | "medium" | "high") => void;
+	setMaxResolution: (resolution?: { width: number; height: number }) => void;
+	setTargetFileSize: (size?: number) => void;
 	resetConfig: () => void;
 	getConfig: () => VideoFormatConfig;
 
@@ -28,6 +34,12 @@ interface VideoFormatState {
 	getSupportedCodecs: () => string[];
 	getRecommendedCodec: (format: VideoFormat) => string;
 	getMimeType: () => string;
+	getWhatsAppOptimizedSettings: () => {
+		bitrate: number;
+		maxResolution: { width: number; height: number };
+		targetFileSize: number;
+		mimeType: string;
+	};
 }
 
 const defaultState = {
@@ -35,6 +47,8 @@ const defaultState = {
 	codec: "vp9",
 	bitrate: undefined,
 	quality: "medium" as const,
+	maxResolution: undefined,
+	targetFileSize: undefined,
 };
 
 export const useVideoFormatStore = create<VideoFormatState>()(
@@ -44,7 +58,25 @@ export const useVideoFormatStore = create<VideoFormatState>()(
 
 			setFormat: (format) => {
 				const recommendedCodec = get().getRecommendedCodec(format);
-				set({ format, codec: recommendedCodec });
+
+				// Apply WhatsApp optimizations automatically
+				if (format === "whatsapp") {
+					const whatsappSettings = get().getWhatsAppOptimizedSettings();
+					set({
+						format,
+						codec: "h264",
+						bitrate: whatsappSettings.bitrate,
+						maxResolution: whatsappSettings.maxResolution,
+						targetFileSize: whatsappSettings.targetFileSize,
+					});
+				} else {
+					set({
+						format,
+						codec: recommendedCodec,
+						maxResolution: undefined,
+						targetFileSize: undefined,
+					});
+				}
 			},
 
 			setCodec: (codec) => set({ codec }),
@@ -52,6 +84,10 @@ export const useVideoFormatStore = create<VideoFormatState>()(
 			setBitrate: (bitrate) => set({ bitrate }),
 
 			setQuality: (quality) => set({ quality }),
+
+			setMaxResolution: (resolution) => set({ maxResolution: resolution }),
+
+			setTargetFileSize: (size) => set({ targetFileSize: size }),
 
 			resetConfig: () => set(defaultState),
 
@@ -62,6 +98,8 @@ export const useVideoFormatStore = create<VideoFormatState>()(
 					codec: state.codec,
 					bitrate: state.bitrate,
 					quality: state.quality,
+					maxResolution: state.maxResolution,
+					targetFileSize: state.targetFileSize,
 				};
 			},
 
@@ -71,6 +109,9 @@ export const useVideoFormatStore = create<VideoFormatState>()(
 
 				if (format === "webm") {
 					codecs = ["vp9", "vp8", "av01"];
+				} else if (format === "whatsapp") {
+					// WhatsApp works best with H.264
+					codecs = ["h264", "avc1"];
 				} else {
 					// Try various MP4 codec formats that are commonly supported
 					codecs = [
@@ -131,6 +172,10 @@ export const useVideoFormatStore = create<VideoFormatState>()(
 					if (supportedCodecs.includes("vp9")) return "vp9";
 					if (supportedCodecs.includes("vp8")) return "vp8";
 					if (supportedCodecs.includes("av01")) return "av01";
+				} else if (format === "whatsapp") {
+					// WhatsApp prefers H.264
+					if (supportedCodecs.includes("h264")) return "h264";
+					if (supportedCodecs.includes("avc1")) return "avc1";
 				} else {
 					// Prefer H264 for MP4
 					if (supportedCodecs.includes("h264")) return "h264";
@@ -146,6 +191,9 @@ export const useVideoFormatStore = create<VideoFormatState>()(
 				let mimeType: string;
 				if (format === "webm") {
 					mimeType = `video/webm; codecs=${codec}`;
+				} else if (format === "whatsapp") {
+					// WhatsApp uses MP4 format
+					mimeType = `video/mp4; codecs=${codec}`;
 				} else {
 					mimeType = `video/mp4; codecs=${codec}`;
 				}
@@ -174,6 +222,16 @@ export const useVideoFormatStore = create<VideoFormatState>()(
 
 				return mimeType;
 			},
+
+			getWhatsAppOptimizedSettings: () => {
+				return {
+					// WhatsApp limitations: 16MB max file size
+					bitrate: 500000, // 500kbps - low bitrate for smaller files
+					maxResolution: { width: 720, height: 720 }, // Max 720p for better compatibility
+					targetFileSize: 15, // Target 15MB to stay under 16MB limit
+					mimeType: "video/mp4; codecs=h264",
+				};
+			},
 		}),
 		{
 			name: "video-format-config-storage",
@@ -182,6 +240,8 @@ export const useVideoFormatStore = create<VideoFormatState>()(
 				codec: state.codec,
 				bitrate: state.bitrate,
 				quality: state.quality,
+				maxResolution: state.maxResolution,
+				targetFileSize: state.targetFileSize,
 			}),
 		},
 	),

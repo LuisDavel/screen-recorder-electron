@@ -90,11 +90,13 @@ export function addScreenRecorderEventListeners(mainWindow: BrowserWindow) {
 				console.log("Salvando vídeo - tamanho do buffer:", videoBuffer.length);
 				console.log("Formato solicitado:", format);
 
-				const extension = format === "mp4" ? "mp4" : "webm";
+				const extension =
+					format === "mp4" || format === "whatsapp" ? "mp4" : "webm";
+				const formatSuffix = format === "whatsapp" ? "-whatsapp" : "";
 				const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
 					defaultPath: join(
 						app.getPath("videos"),
-						`screen-recording-${Date.now()}.${extension}`,
+						`screen-recording${formatSuffix}-${Date.now()}.${extension}`,
 					),
 					filters: [
 						{ name: "Video Files", extensions: ["webm", "mp4"] },
@@ -182,8 +184,10 @@ export function addScreenRecorderEventListeners(mainWindow: BrowserWindow) {
 				console.log("Formato solicitado:", format);
 
 				const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-				const extension = format === "mp4" ? "mp4" : "webm";
-				const fileName = `screen-recording-${timestamp}.${extension}`;
+				const extension =
+					format === "mp4" || format === "whatsapp" ? "mp4" : "webm";
+				const formatSuffix = format === "whatsapp" ? "-whatsapp" : "";
+				const fileName = `screen-recording${formatSuffix}-${timestamp}.${extension}`;
 				const filePath = join(saveLocation, fileName);
 
 				console.log("Caminho completo:", filePath);

@@ -490,6 +490,25 @@ export class AdvancedScreenRecorderManager {
 		this.options = options;
 
 		try {
+			// Aplicar otimizações do WhatsApp se necessário
+			const videoFormatState = useVideoFormatStore.getState();
+			if (videoFormatState.format === "whatsapp") {
+				const whatsappSettings =
+					videoFormatState.getWhatsAppOptimizedSettings();
+				console.log("🎬 Aplicando otimizações do WhatsApp:", whatsappSettings);
+
+				// Sobrescrever configurações com otimizações do WhatsApp
+				options.videoBitrate = whatsappSettings.bitrate;
+				options.outputWidth = whatsappSettings.maxResolution.width;
+				options.outputHeight = whatsappSettings.maxResolution.height;
+
+				console.log("📱 Configurações aplicadas para WhatsApp:", {
+					bitrate: options.videoBitrate,
+					resolucao: `${options.outputWidth}x${options.outputHeight}`,
+					tamanhoAlvo: `${whatsappSettings.targetFileSize}MB`,
+				});
+			}
+
 			// Obter stream da tela
 			this.screenStream = await this.getScreenStream(options.sourceId);
 
@@ -515,9 +534,10 @@ export class AdvancedScreenRecorderManager {
 				mimeType,
 			};
 
-			// Adicionar bitrate se especificado
+			// Adicionar bitrate se especificado (incluindo otimizações do WhatsApp)
 			if (options.videoBitrate) {
 				recordingOptions.videoBitsPerSecond = options.videoBitrate;
+				console.log("🎯 Bitrate configurado:", options.videoBitrate);
 			}
 
 			this.mediaRecorder = new MediaRecorder(

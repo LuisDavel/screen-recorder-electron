@@ -26,6 +26,8 @@ export function VideoFormatSelector() {
 		format,
 		codec,
 		quality,
+		maxResolution,
+		targetFileSize,
 		setFormat,
 		setCodec,
 		setQuality,
@@ -57,6 +59,7 @@ export function VideoFormatSelector() {
 	const formatOptions = [
 		{ value: "webm", label: "WebM (Padrão)" },
 		{ value: "mp4", label: "MP4 (Compatível)" },
+		{ value: "whatsapp", label: "WhatsApp (Otimizado)" },
 	];
 
 	const qualityOptions = [
@@ -122,7 +125,9 @@ export function VideoFormatSelector() {
 								<p className="text-sm text-muted-foreground">
 									{format === "webm"
 										? "WebM oferece boa qualidade e compactação, mas pode ter compatibilidade limitada."
-										: "MP4 tem ampla compatibilidade mas pode ter qualidade ligeiramente inferior."}
+										: format === "whatsapp"
+											? "Formato otimizado para WhatsApp: tamanho reduzido (max 15MB), resolução adequada para mobile."
+											: "MP4 tem ampla compatibilidade mas pode ter qualidade ligeiramente inferior."}
 								</p>
 							</div>
 
@@ -171,6 +176,8 @@ export function VideoFormatSelector() {
 								</p>
 							</div>
 
+							{/* WhatsApp Information */}
+
 							{/* Current Configuration Display */}
 							<div className="rounded-lg bg-muted p-4 space-y-2">
 								<h4 className="font-medium">Configuração Atual</h4>
@@ -188,6 +195,20 @@ export function VideoFormatSelector() {
 									<p>
 										<strong>MIME Type:</strong> {getMimeType()}
 									</p>
+									{format === "whatsapp" && (
+										<>
+											<p>
+												<strong>Resolução máxima:</strong>{" "}
+												{maxResolution
+													? `${maxResolution.width}x${maxResolution.height}`
+													: "720x720"}
+											</p>
+											<p>
+												<strong>Tamanho alvo:</strong>{" "}
+												{targetFileSize ? `${targetFileSize}MB` : "15MB"}
+											</p>
+										</>
+									)}
 								</div>
 							</div>
 						</div>
@@ -198,7 +219,9 @@ export function VideoFormatSelector() {
 			{/* Current format display */}
 			<div className="flex items-center gap-2 text-sm text-muted-foreground">
 				<div className="flex items-center gap-1">
-					<div className="w-2 h-2 bg-green-500 rounded-full"></div>
+					<div
+						className={`w-2 h-2 rounded-full ${format === "whatsapp" ? "bg-green-500 animate-pulse" : "bg-green-500"}`}
+					></div>
 					<span>Formato atual: {format.toUpperCase()}</span>
 				</div>
 				<span>•</span>
@@ -207,6 +230,14 @@ export function VideoFormatSelector() {
 				<span>
 					Qualidade: {qualityOptions.find((q) => q.value === quality)?.label}
 				</span>
+				{format === "whatsapp" && (
+					<>
+						<span>•</span>
+						<span className="text-green-600 dark:text-green-400">
+							Otimizado
+						</span>
+					</>
+				)}
 			</div>
 		</div>
 	);
