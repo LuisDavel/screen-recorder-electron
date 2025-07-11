@@ -7,6 +7,7 @@ export class VideoHeaderComposer {
 	private animationFrameId: number | null = null;
 	private stream: MediaStream | null = null;
 	private headerConfig: HeaderConfig;
+	private dimensionsLogged = false;
 
 	constructor(headerConfig: HeaderConfig) {
 		this.headerConfig = headerConfig;
@@ -15,10 +16,18 @@ export class VideoHeaderComposer {
 		this.canvas = document.createElement("canvas");
 		this.ctx = this.canvas.getContext("2d", { alpha: false })!;
 
+		// Configurar contexto para forçar preenchimento completo
+		this.ctx.imageSmoothingEnabled = false;
+		this.ctx.fillStyle = "#000000";
+
 		// Create video element for source stream
 		this.video = document.createElement("video");
 		this.video.autoplay = true;
 		this.video.muted = true;
+		// Forçar dimensões do vídeo para garantir renderização correta
+		this.video.style.width = "100%";
+		this.video.style.height = "100%";
+		this.video.style.objectFit = "fill";
 	}
 
 	async composeWithHeader(
@@ -75,6 +84,9 @@ export class VideoHeaderComposer {
 			},
 		});
 
+		// Ajustar canvas para corresponder ao aspect ratio do vídeo
+		this.adjustCanvasToVideoAspectRatio();
+
 		// Start composition loop
 		this.startComposition();
 
@@ -93,6 +105,43 @@ export class VideoHeaderComposer {
 		});
 
 		return this.stream;
+	}
+
+	// Ajustar dimensões do canvas para corresponder ao aspect ratio do vídeo
+	private adjustCanvasToVideoAspectRatio(): void {
+		if (this.video.readyState < 2) return;
+
+		const videoWidth = this.video.videoWidth;
+		const videoHeight = this.video.videoHeight;
+
+		if (!videoWidth || !videoHeight) return;
+
+		const videoAspectRatio = videoWidth / videoHeight;
+		const canvasAspectRatio = this.canvas.width / this.canvas.height;
+		const aspectRatioDiff = Math.abs(canvasAspectRatio - videoAspectRatio);
+
+		// Se a diferença for maior que 1%, ajustar o canvas
+		if (aspectRatioDiff > 0.01) {
+			console.log(
+				"🔧 HeaderComposer: Ajustando canvas para corresponder ao aspect ratio do vídeo...",
+			);
+
+			// Manter a largura e ajustar a altura baseada no aspect ratio do vídeo
+			const newHeight = Math.round(this.canvas.width / videoAspectRatio);
+
+			// Garantir que seja par (requirement para codecs)
+			const adjustedHeight = Math.round(newHeight / 2) * 2;
+
+			console.log("📐 HeaderComposer: Ajuste de dimensões:", {
+				original: `${this.canvas.width}x${this.canvas.height}`,
+				adjusted: `${this.canvas.width}x${adjustedHeight}`,
+				originalAspectRatio: canvasAspectRatio.toFixed(3),
+				newAspectRatio: (this.canvas.width / adjustedHeight).toFixed(3),
+				videoAspectRatio: videoAspectRatio.toFixed(3),
+			});
+
+			this.canvas.height = adjustedHeight;
+		}
 	}
 
 	private startComposition() {
@@ -116,69 +165,55 @@ export class VideoHeaderComposer {
 				this.ctx.fillStyle = "#000000";
 				this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-				// Calculate video position with header at top, preserving aspect ratio
-				const headerHeight = this.headerConfig.height;
-				const availableHeight = this.canvas.height - headerHeight;
-				const availableWidth = this.canvas.width;
-
-				// Get video dimensions
+				// Debug: log das dimensões
 				const videoWidth = this.video.videoWidth || this.canvas.width;
 				const videoHeight = this.video.videoHeight || this.canvas.height;
-				const videoAspectRatio = videoWidth / videoHeight;
-				const availableAspectRatio = availableWidth / availableHeight;
 
-				let drawWidth: number;
-				let drawHeight: number;
-				let drawX: number;
-				let drawY: number;
+				if (!this.dimensionsLogged) {
+					const canvasAspectRatio = this.canvas.width / this.canvas.height;
+					const videoAspectRatio = videoWidth / videoHeight;
+					const aspectRatioDiff = Math.abs(
+						canvasAspectRatio - videoAspectRatio,
+					);
 
-				// Calculate dimensions to maintain aspect ratio
-				if (videoAspectRatio > availableAspectRatio) {
-					// Video is wider than available space - fit by width
-					drawWidth = availableWidth;
-					drawHeight = availableWidth / videoAspectRatio;
-					drawX = 0;
-					drawY = headerHeight + (availableHeight - drawHeight) / 2;
-				} else {
-					// Video is taller than available space - fit by height
-					drawWidth = availableHeight * videoAspectRatio;
-					drawHeight = availableHeight;
-					drawX = (availableWidth - drawWidth) / 2;
-					drawY = headerHeight;
+					console.log("VideoHeaderComposer renderFrameContent:", {
+						canvasSize: {
+							width: this.canvas.width,
+							height: this.canvas.height,
+						},
+						videoSize: { width: videoWidth, height: videoHeight },
+						aspectRatio: {
+							canvas: canvasAspectRatio.toFixed(3),
+							video: videoAspectRatio.toFixed(3),
+							difference: aspectRatioDiff.toFixed(3),
+						},
+						willDistort: aspectRatioDiff > 0.01,
+					});
+
+					if (aspectRatioDiff > 0.01) {
+						console.warn(
+							"⚠️  AVISO: Canvas e vídeo têm aspect ratios diferentes no HeaderComposer - pode haver distorção!",
+						);
+					}
+
+					this.dimensionsLogged = true;
 				}
 
-				console.log(
-					"VideoHeaderComposer: Desenhando vídeo com header (aspect ratio preservado)",
-					{
-						headerHeight,
-						availableWidth,
-						availableHeight,
-						videoSize: { width: videoWidth, height: videoHeight },
-						videoAspectRatio: videoAspectRatio.toFixed(3),
-						availableAspectRatio: availableAspectRatio.toFixed(3),
-						drawDimensions: {
-							x: Math.round(drawX),
-							y: Math.round(drawY),
-							width: Math.round(drawWidth),
-							height: Math.round(drawHeight),
-						},
-					},
-				);
-
-				// Draw video below header with preserved aspect ratio
+				// Desenhar vídeo ocupando todo o canvas sem distorção
+				// Se o canvas tem aspect ratio correto, usar dimensões diretas
 				this.ctx.drawImage(
 					this.video,
 					0,
+					0, // source x, y
+					videoWidth, // source width
+					videoHeight, // source height
 					0,
-					videoWidth,
-					videoHeight, // source
-					drawX,
-					drawY,
-					drawWidth,
-					drawHeight, // destination
+					0, // destination x, y
+					this.canvas.width, // destination width
+					this.canvas.height, // destination height
 				);
 
-				// Draw header
+				// Desenhar header sobreposto no topo
 				this.drawHeader();
 			}
 

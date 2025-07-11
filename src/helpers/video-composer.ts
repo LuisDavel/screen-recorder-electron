@@ -1,19 +1,25 @@
-import { CameraPosition, CameraSize } from "@/store/store-camera-config";
+// Tipos corretos para posição e tamanho da câmera
+export type CameraPositionType =
+	| "top-left"
+	| "top-right"
+	| "bottom-left"
+	| "bottom-right";
+export type CameraSizeType = "small" | "medium" | "large";
 
 export interface VideoComposerOptions {
 	screenStream: MediaStream;
 	cameraStream?: MediaStream;
 	audioStream?: MediaStream;
-	cameraPosition?: CameraPosition;
-	cameraSize?: CameraSize;
+	cameraPosition?: CameraPositionType;
+	cameraSize?: CameraSizeType;
 	outputWidth?: number;
 	outputHeight?: number;
 	frameRate?: number;
 }
 
 export interface CameraSettings {
-	position: CameraPosition;
-	size: CameraSize;
+	position: CameraPositionType;
+	size: CameraSizeType;
 	width: number;
 	height: number;
 	x: number;
@@ -31,6 +37,7 @@ export class VideoComposer {
 	private isComposing = false;
 	private isPageVisible = true;
 	private useTimer = false;
+	private dimensionsLogged = false;
 
 	// Configurações padrão
 	private options: Required<
@@ -63,12 +70,20 @@ export class VideoComposer {
 		}
 		this.ctx = ctx;
 
+		// Configurar contexto para forçar preenchimento completo
+		this.ctx.imageSmoothingEnabled = false;
+		this.ctx.fillStyle = "#000000";
+
 		// Criar elementos de vídeo
 		this.screenVideo = document.createElement("video");
 		this.screenVideo.srcObject = this.options.screenStream;
 		this.screenVideo.autoplay = true;
 		this.screenVideo.muted = true;
 		this.screenVideo.playsInline = true;
+		// Forçar dimensões do vídeo para garantir renderização correta
+		this.screenVideo.style.width = "100%";
+		this.screenVideo.style.height = "100%";
+		this.screenVideo.style.objectFit = "fill";
 
 		if (this.options.cameraStream) {
 			this.cameraVideo = document.createElement("video");
@@ -244,53 +259,62 @@ export class VideoComposer {
 			// Limpar canvas
 			this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-			// Desenhar tela de fundo preservando aspect ratio
+			// Desenhar tela de fundo ocupando todo o canvas (forçando esticamento)
+			// Agora o vídeo da tela ocupa todo o espaço disponível
 			if (this.screenVideo.readyState >= 2) {
-				// Get video dimensions
+				// Debug: log das dimensões
 				const videoWidth = this.screenVideo.videoWidth || this.canvas.width;
 				const videoHeight = this.screenVideo.videoHeight || this.canvas.height;
-				const videoAspectRatio = videoWidth / videoHeight;
-				const canvasAspectRatio = this.canvas.width / this.canvas.height;
 
-				let drawWidth: number;
-				let drawHeight: number;
-				let drawX: number;
-				let drawY: number;
+				if (!this.dimensionsLogged) {
+					const canvasAspectRatio = this.canvas.width / this.canvas.height;
+					const videoAspectRatio = videoWidth / videoHeight;
+					const aspectRatioDiff = Math.abs(
+						canvasAspectRatio - videoAspectRatio,
+					);
 
-				// Calculate dimensions to maintain aspect ratio
-				if (videoAspectRatio > canvasAspectRatio) {
-					// Video is wider than canvas - fit by width
-					drawWidth = this.canvas.width;
-					drawHeight = this.canvas.width / videoAspectRatio;
-					drawX = 0;
-					drawY = (this.canvas.height - drawHeight) / 2;
-				} else {
-					// Video is taller than canvas - fit by height
-					drawWidth = this.canvas.height * videoAspectRatio;
-					drawHeight = this.canvas.height;
-					drawX = (this.canvas.width - drawWidth) / 2;
-					drawY = 0;
+					console.log("VideoComposer renderFrameContent:", {
+						canvasSize: {
+							width: this.canvas.width,
+							height: this.canvas.height,
+						},
+						videoSize: { width: videoWidth, height: videoHeight },
+						aspectRatio: {
+							canvas: canvasAspectRatio.toFixed(3),
+							video: videoAspectRatio.toFixed(3),
+							difference: aspectRatioDiff.toFixed(3),
+						},
+						willDistort: aspectRatioDiff > 0.01, // Se a diferença for maior que 1%
+					});
+
+					if (aspectRatioDiff > 0.01) {
+						console.warn(
+							"⚠️  AVISO: Canvas e vídeo têm aspect ratios diferentes - pode haver distorção!",
+						);
+						console.warn(
+							"💡 Solução: Ajustar dimensões do canvas para corresponder ao aspect ratio do vídeo",
+						);
+					}
+
+					this.dimensionsLogged = true;
 				}
 
-				// Fill background with black if video doesn't cover entire canvas
-				this.ctx.fillStyle = "#000000";
-				this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-				// Draw screen video with preserved aspect ratio
+				// Desenhar vídeo da tela preenchendo todo o canvas sem distorção
+				// Se o canvas tem aspect ratio correto, usar dimensões diretas
 				this.ctx.drawImage(
 					this.screenVideo,
 					0,
+					0, // source x, y
+					videoWidth, // source width
+					videoHeight, // source height
 					0,
-					videoWidth,
-					videoHeight, // source
-					drawX,
-					drawY,
-					drawWidth,
-					drawHeight, // destination
+					0, // destination x, y
+					this.canvas.width, // destination width
+					this.canvas.height, // destination height
 				);
 			}
 
-			// Desenhar câmera se disponível
+			// Desenhar câmera sobreposicionada se disponível
 			if (this.cameraVideo && this.cameraVideo.readyState >= 2) {
 				const cameraSettings = this.calculateCameraSettings();
 
@@ -304,7 +328,7 @@ export class VideoComposer {
 					cameraSettings.height + 2,
 				);
 
-				// Desenhar câmera
+				// Desenhar câmera sobreposicionada
 				this.ctx.drawImage(
 					this.cameraVideo,
 					cameraSettings.x,
@@ -344,6 +368,9 @@ export class VideoComposer {
 		const waitForVideos = () => {
 			if (this.screenVideo.readyState >= 2) {
 				if (!this.cameraVideo || this.cameraVideo.readyState >= 2) {
+					// Ajustar canvas para corresponder ao aspect ratio do vídeo
+					this.adjustCanvasToVideoAspectRatio();
+
 					// Start appropriate rendering method
 					if (this.isPageVisible) {
 						this.renderFrame();
@@ -472,8 +499,8 @@ export class VideoComposer {
 
 	// Atualizar configurações da câmera
 	public updateCameraSettings(
-		position: CameraPosition,
-		size: CameraSize,
+		position: CameraPositionType,
+		size: CameraSizeType,
 	): void {
 		console.log("Atualizando configurações da câmera", { position, size });
 		this.options.cameraPosition = position;
@@ -495,8 +522,8 @@ export class VideoComposer {
 		outputWidth: number;
 		outputHeight: number;
 		frameRate: number;
-		cameraPosition: CameraPosition;
-		cameraSize: CameraSize;
+		cameraPosition: CameraPositionType;
+		cameraSize: CameraSizeType;
 		hasCameraStream: boolean;
 		hasAudioStream: boolean;
 	} {
@@ -509,6 +536,59 @@ export class VideoComposer {
 			hasCameraStream: !!this.options.cameraStream,
 			hasAudioStream: !!this.options.audioStream,
 		};
+	}
+
+	// Ajustar dimensões do canvas para corresponder EXATAMENTE ao vídeo
+	private adjustCanvasToVideoAspectRatio(): void {
+		if (this.screenVideo.readyState < 2) return;
+
+		const videoWidth = this.screenVideo.videoWidth;
+		const videoHeight = this.screenVideo.videoHeight;
+
+		if (!videoWidth || !videoHeight) {
+			console.warn("⚠️ Dimensões do vídeo não disponíveis ainda");
+			return;
+		}
+
+		console.log("🔍 Ajustando canvas para vídeo:", {
+			video: `${videoWidth}x${videoHeight}`,
+			canvas: `${this.canvas.width}x${this.canvas.height}`,
+			videoAspectRatio: (videoWidth / videoHeight).toFixed(3),
+			canvasAspectRatio: (this.canvas.width / this.canvas.height).toFixed(3),
+		});
+
+		// SEMPRE ajustar o canvas para corresponder EXATAMENTE às dimensões do vídeo
+		// Isso garante que não haverá distorção
+		let adjustedWidth = videoWidth;
+		let adjustedHeight = videoHeight;
+
+		// Garantir que sejam pares (requirement para codecs)
+		adjustedWidth = Math.round(adjustedWidth / 2) * 2;
+		adjustedHeight = Math.round(adjustedHeight / 2) * 2;
+
+		console.log(
+			"🔧 FORÇANDO ajuste do canvas para dimensões exatas do vídeo:",
+			{
+				original: `${this.canvas.width}x${this.canvas.height}`,
+				adjusted: `${adjustedWidth}x${adjustedHeight}`,
+				originalAspectRatio: (this.canvas.width / this.canvas.height).toFixed(
+					3,
+				),
+				newAspectRatio: (adjustedWidth / adjustedHeight).toFixed(3),
+				videoAspectRatio: (videoWidth / videoHeight).toFixed(3),
+			},
+		);
+
+		// Aplicar as novas dimensões
+		this.canvas.width = adjustedWidth;
+		this.canvas.height = adjustedHeight;
+		this.options.outputWidth = adjustedWidth;
+		this.options.outputHeight = adjustedHeight;
+
+		console.log(
+			"✅ Canvas ajustado com sucesso para:",
+			`${this.canvas.width}x${this.canvas.height}`,
+		);
 	}
 
 	// Obter canvas (para debug)
@@ -611,8 +691,8 @@ export class VideoComposer {
 export async function createVideoComposer(
 	screenStream: MediaStream,
 	cameraStream: MediaStream | null,
-	cameraPosition: CameraPosition = "bottom-right",
-	cameraSize: CameraSize = "medium",
+	cameraPosition: CameraPositionType = "bottom-right",
+	cameraSize: CameraSizeType = "medium",
 	audioStream: MediaStream | null = null,
 ): Promise<VideoComposer> {
 	if (!VideoComposer.isSupported()) {
