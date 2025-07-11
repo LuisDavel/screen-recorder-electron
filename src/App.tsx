@@ -10,23 +10,23 @@ import { RouterProvider } from "@tanstack/react-router";
 import { ToastProvider } from "./components/Toast";
 
 export default function App() {
-  const { i18n } = useTranslation();
+	const { i18n } = useTranslation();
 
-  useEffect(() => {
-    syncThemeWithLocal();
-    updateAppLanguage(i18n);
-  }, [i18n]);
+	useEffect(() => {
+		syncThemeWithLocal();
+		updateAppLanguage(i18n);
+	}, [i18n]);
 
-  return (
-    <ToastProvider>
-      <RouterProvider router={router} />
-    </ToastProvider>
-  );
+	return (
+		<ToastProvider>
+			<RouterProvider router={router} />
+		</ToastProvider>
+	);
 }
 
 const root = createRoot(document.getElementById("app")!);
 root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
+	<React.StrictMode>
+		<App />
+	</React.StrictMode>,
 );

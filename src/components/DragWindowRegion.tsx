@@ -6,7 +6,7 @@ import {
 import usePlatform from "@/hooks/usePlatform";
 import React from "react";
 
-export function DragWindowRegion() {
+export const DragWindowRegion = React.memo(() => {
 	const { isWindows } = usePlatform();
 	return (
 		<div className="p-2">
@@ -83,4 +83,6 @@ export function DragWindowRegion() {
 			)}
 		</div>
 	);
-}
+});
+
+DragWindowRegion.displayName = "DragWindowRegion";

@@ -19,19 +19,8 @@ export default React.memo(function ScreenRecorder() {
 	const { sourceId } = useSourceVideoStore();
 
 	// Log para debug da contagem regressiva
-	useEffect(() => {
-		console.log("🎬 ScreenRecorder - Contagem regressiva mudou:", countdown);
-	}, [countdown]);
-
-	// Função para atualizar contagem regressiva com logs
 	const handleCountdownChange = useCallback((newCountdown: number | null) => {
-		console.log("🎬 ScreenRecorder - Recebendo nova contagem:", newCountdown);
 		setCountdown(newCountdown);
-		console.log("🎬 ScreenRecorder - Estado atualizado para:", newCountdown);
-
-		// Debug para verificar se o isOpen será calculado corretamente
-		const willBeOpen = newCountdown !== null && newCountdown >= 0;
-		console.log("🎬 ScreenRecorder - Popup será aberto:", willBeOpen);
 	}, []);
 
 	// Memoize the preview stream generation function

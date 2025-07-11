@@ -41,16 +41,6 @@ export function RecordingControls({
 	const [includeMicrophone, setIncludeMicrophone] = useState(false);
 	const [includeHeader, setIncludeHeader] = useState(false);
 
-	// Debug log para verificar props
-	useEffect(() => {
-		console.log("🔧 RecordingControls props:", {
-			hasOnCountdownChange: !!onCountdownChange,
-			onCountdownChangeType: typeof onCountdownChange,
-			selectedSourceId: !!selectedSourceId,
-			selectedSaveLocation: !!selectedSaveLocation,
-		});
-	}, [onCountdownChange, selectedSourceId, selectedSaveLocation]);
-
 	// Camera store e notifications
 	const { isEnabled: cameraEnabled, mainStream: cameraStream } =
 		useCameraConfigStore();
@@ -83,23 +73,8 @@ export function RecordingControls({
 
 	// Notificar mudanças na contagem regressiva
 	useEffect(() => {
-		console.log("📊 Mudança na contagem regressiva:", countdown);
-		console.log("📊 onCountdownChange disponível:", !!onCountdownChange);
-
-		// Sempre tentar notificar, mesmo se onCountdownChange for undefined
-		try {
-			if (onCountdownChange && typeof onCountdownChange === "function") {
-				console.log("📢 Chamando onCountdownChange com valor:", countdown);
-				onCountdownChange(countdown);
-				console.log("✅ onCountdownChange chamado com sucesso");
-			} else {
-				console.log(
-					"⚠️ onCountdownChange não é uma função válida:",
-					typeof onCountdownChange,
-				);
-			}
-		} catch (error) {
-			console.error("❌ Erro ao chamar onCountdownChange:", error);
+		if (onCountdownChange && typeof onCountdownChange === "function") {
+			onCountdownChange(countdown);
 		}
 	}, [countdown, onCountdownChange]);
 
@@ -111,11 +86,9 @@ export function RecordingControls({
 
 			const interval = setInterval(() => {
 				count--;
-				console.log("Contagem atual:", count);
 				setCountdown(count);
 
 				if (count < 0) {
-					console.log("Contagem terminada!");
 					setCountdown(null);
 					clearInterval(interval);
 					resolve();
@@ -140,9 +113,6 @@ export function RecordingControls({
 
 			// Verificar se câmera está habilitada mas usuário quer incluir overlay
 			if (includeCameraOverlay && !cameraEnabled) {
-				console.log(
-					"❌ Erro: Câmera deve estar habilitada para incluir overlay",
-				);
 				showError(
 					"Câmera deve estar habilitada para incluir overlay na gravação",
 				);
@@ -150,7 +120,6 @@ export function RecordingControls({
 			}
 
 			if (includeCameraOverlay && cameraEnabled && !cameraStream) {
-				console.log("❌ Erro: Stream da câmera não disponível");
 				showError(
 					"Stream da câmera não disponível. Verifique as configurações da câmera",
 				);
@@ -159,9 +128,6 @@ export function RecordingControls({
 
 			// Verificar se microfone está habilitado mas usuário quer incluir áudio
 			if (includeMicrophone && !microphoneEnabled) {
-				console.log(
-					"❌ Erro: Microfone deve estar habilitado para incluir áudio",
-				);
 				showError(
 					"Microfone deve estar habilitado para incluir áudio na gravação",
 				);
@@ -169,7 +135,6 @@ export function RecordingControls({
 			}
 
 			if (includeMicrophone && microphoneEnabled && !microphoneStream) {
-				console.log("❌ Erro: Stream do microfone não disponível");
 				showError(
 					"Stream do microfone não disponível. Verifique as configurações do microfone",
 				);
@@ -219,7 +184,6 @@ export function RecordingControls({
 				`Erro ao iniciar gravação: ${error instanceof Error ? error.message : String(error)}`,
 			);
 		} finally {
-			console.log("🎬 handleStartRecording terminando, setIsLoading(false)");
 			setIsLoading(false);
 		}
 	};
