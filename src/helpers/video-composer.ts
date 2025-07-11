@@ -59,6 +59,16 @@ export class VideoComposer {
 			frameRate: options.frameRate || 30,
 		};
 
+		console.log("🎬 VideoComposer: Inicializando com dimensões:", {
+			outputWidth: this.options.outputWidth,
+			outputHeight: this.options.outputHeight,
+			aspectRatio: (
+				this.options.outputWidth / this.options.outputHeight
+			).toFixed(3),
+			providedDimensions:
+				options.outputWidth && options.outputHeight ? "sim" : "usando padrão",
+		});
+
 		// Criar canvas
 		this.canvas = document.createElement("canvas");
 		this.canvas.width = this.options.outputWidth;
@@ -266,6 +276,7 @@ export class VideoComposer {
 				const videoWidth = this.screenVideo.videoWidth || this.canvas.width;
 				const videoHeight = this.screenVideo.videoHeight || this.canvas.height;
 
+				// Verificação uma vez só para detectar problemas
 				if (!this.dimensionsLogged) {
 					const canvasAspectRatio = this.canvas.width / this.canvas.height;
 					const videoAspectRatio = videoWidth / videoHeight;
@@ -273,40 +284,57 @@ export class VideoComposer {
 						canvasAspectRatio - videoAspectRatio,
 					);
 
-					console.log("VideoComposer renderFrameContent:", {
-						canvasSize: {
-							width: this.canvas.width,
-							height: this.canvas.height,
-						},
-						videoSize: { width: videoWidth, height: videoHeight },
-						aspectRatio: {
+					console.log("🎥 VideoComposer renderização:", {
+						canvas: `${this.canvas.width}x${this.canvas.height}`,
+						video: `${videoWidth}x${videoHeight}`,
+						aspectRatios: {
 							canvas: canvasAspectRatio.toFixed(3),
 							video: videoAspectRatio.toFixed(3),
-							difference: aspectRatioDiff.toFixed(3),
 						},
-						willDistort: aspectRatioDiff > 0.01, // Se a diferença for maior que 1%
+						distorção: aspectRatioDiff > 0.01 ? "⚠️ SIM" : "✅ NÃO",
 					});
-
-					if (aspectRatioDiff > 0.01) {
-						console.warn(
-							"⚠️  AVISO: Canvas e vídeo têm aspect ratios diferentes - pode haver distorção!",
-						);
-						console.warn(
-							"💡 Solução: Ajustar dimensões do canvas para corresponder ao aspect ratio do vídeo",
-						);
-					}
 
 					this.dimensionsLogged = true;
 				}
 
-				// Desenhar vídeo da tela preenchendo todo o canvas sem distorção
-				// Se o canvas tem aspect ratio correto, usar dimensões diretas
+				// Desenhar vídeo FORÇANDO preenchimento total (crop/fill para eliminar achatamento)
+				// Calcular dimensões para preencher completamente o canvas
+				const canvasAspectRatio = this.canvas.width / this.canvas.height;
+				const videoAspectRatio = videoWidth / videoHeight;
+
+				let srcX = 0,
+					srcY = 0,
+					srcWidth = videoWidth,
+					srcHeight = videoHeight;
+
+				// Se o vídeo tem aspect ratio diferente, fazer crop para preencher
+				if (Math.abs(canvasAspectRatio - videoAspectRatio) > 0.01) {
+					console.log("🔧 Aplicando crop/fill para corrigir aspect ratio:", {
+						canvas: `${this.canvas.width}x${this.canvas.height} (${canvasAspectRatio.toFixed(3)})`,
+						video: `${videoWidth}x${videoHeight} (${videoAspectRatio.toFixed(3)})`,
+					});
+
+					if (canvasAspectRatio > videoAspectRatio) {
+						// Canvas mais largo - cortar altura do vídeo
+						const targetHeight = videoWidth / canvasAspectRatio;
+						srcY = (videoHeight - targetHeight) / 2;
+						srcHeight = targetHeight;
+						console.log("📐 Cortando altura do vídeo:", { srcY, srcHeight });
+					} else {
+						// Canvas mais alto - cortar largura do vídeo
+						const targetWidth = videoHeight * canvasAspectRatio;
+						srcX = (videoWidth - targetWidth) / 2;
+						srcWidth = targetWidth;
+						console.log("📐 Cortando largura do vídeo:", { srcX, srcWidth });
+					}
+				}
+
 				this.ctx.drawImage(
 					this.screenVideo,
-					0,
-					0, // source x, y
-					videoWidth, // source width
-					videoHeight, // source height
+					srcX,
+					srcY, // source x, y (com crop)
+					srcWidth,
+					srcHeight, // source width, height (com crop)
 					0,
 					0, // destination x, y
 					this.canvas.width, // destination width
@@ -370,6 +398,15 @@ export class VideoComposer {
 				if (!this.cameraVideo || this.cameraVideo.readyState >= 2) {
 					// Ajustar canvas para corresponder ao aspect ratio do vídeo
 					this.adjustCanvasToVideoAspectRatio();
+
+					// Para monitores ultrawide, forçar aspect ratio específico
+					const aspectRatio = this.canvas.width / this.canvas.height;
+					if (aspectRatio > 2.0) {
+						console.log(
+							"🖥️ Monitor ultrawide detectado - aplicando correção forçada",
+						);
+						this.forceUltrawideAspectRatio();
+					}
 
 					// Start appropriate rendering method
 					if (this.isPageVisible) {
@@ -591,6 +628,81 @@ export class VideoComposer {
 		);
 	}
 
+	// Forçar redimensionamento do canvas para corrigir achatamento ultrawide
+	public forceUltrawideAspectRatio(): void {
+		const videoWidth = this.screenVideo.videoWidth || 0;
+		const videoHeight = this.screenVideo.videoHeight || 0;
+
+		if (!videoWidth || !videoHeight) {
+			console.warn(
+				"⚠️ Não é possível forçar aspect ratio - vídeo não carregado",
+			);
+			return;
+		}
+
+		// Calcular um aspect ratio mais largo para ultrawide
+		const currentAspectRatio = this.canvas.width / this.canvas.height;
+		const videoAspectRatio = videoWidth / videoHeight;
+
+		console.log("🔧 FORÇANDO aspect ratio ultrawide:", {
+			canvasAtual: `${this.canvas.width}x${this.canvas.height} (${currentAspectRatio.toFixed(3)})`,
+			videoOriginal: `${videoWidth}x${videoHeight} (${videoAspectRatio.toFixed(3)})`,
+		});
+
+		// Se o monitor é ultrawide (2540x1080 = 2.35), forçar canvas para esse ratio
+		if (currentAspectRatio > 2.0) {
+			// Para monitores ultrawide, usar uma altura menor para "esticar" o vídeo
+			const newHeight = Math.round(this.canvas.width / 2.35); // Force 21:9 ratio
+
+			console.log("📐 Ajustando para aspect ratio 21:9 forçado:", {
+				original: `${this.canvas.width}x${this.canvas.height}`,
+				novo: `${this.canvas.width}x${newHeight}`,
+				novoAspectRatio: (this.canvas.width / newHeight).toFixed(3),
+			});
+
+			this.canvas.height = newHeight;
+			this.options.outputHeight = newHeight;
+		}
+	}
+
+	// Debug detalhado - verificar estado atual
+	public debugCanvasState(): void {
+		const videoWidth = this.screenVideo.videoWidth || 0;
+		const videoHeight = this.screenVideo.videoHeight || 0;
+
+		console.log("🔍 DEBUG VideoComposer Estado Atual:", {
+			canvas: {
+				width: this.canvas.width,
+				height: this.canvas.height,
+				aspectRatio: (this.canvas.width / this.canvas.height).toFixed(3),
+			},
+			video: {
+				width: videoWidth,
+				height: videoHeight,
+				aspectRatio:
+					videoWidth && videoHeight
+						? (videoWidth / videoHeight).toFixed(3)
+						: "N/A",
+				readyState: this.screenVideo.readyState,
+			},
+			options: {
+				outputWidth: this.options.outputWidth,
+				outputHeight: this.options.outputHeight,
+			},
+			status: {
+				isComposing: this.isComposing,
+				hasVideoStream: !!this.options.screenStream,
+				hasCameraStream: !!this.options.cameraStream,
+			},
+			potentialDistortion:
+				videoWidth && videoHeight
+					? Math.abs(
+							this.canvas.width / this.canvas.height - videoWidth / videoHeight,
+						) > 0.01
+					: "desconhecido",
+		});
+	}
+
 	// Obter canvas (para debug)
 	public getCanvas(): HTMLCanvasElement {
 		return this.canvas;
@@ -637,32 +749,25 @@ export class VideoComposer {
 		}
 	}
 
-	// Método estático para obter configurações recomendadas
+	// Método estático para obter configurações recomendadas - FORÇAR dimensões para ultrawide
 	public static getRecommendedSettings(
 		screenWidth: number,
 		screenHeight: number,
 	): { outputWidth: number; outputHeight: number; frameRate: number } {
-		// Usar as dimensões reais da tela para manter aspect ratio correto
+		console.log(
+			"🎯 Configurando resolução para ultrawide:",
+			`${screenWidth}x${screenHeight}`,
+		);
+
+		// Para monitores ultrawide, FORÇAR largura total
+		let outputWidth = screenWidth;
+		let outputHeight = screenHeight;
+
+		// Se for ultrawide (aspect ratio > 2.0), garantir largura máxima
 		const aspectRatio = screenWidth / screenHeight;
-
-		let outputWidth: number;
-		let outputHeight: number;
-
-		// Sempre usar as dimensões reais da tela para evitar distorção
-		// Apenas redimensionar se for muito grande (mais de 4K)
-		if (screenWidth > 3840 || screenHeight > 2160) {
-			// Para telas 4K+ redimensionar mantendo aspect ratio
-			if (aspectRatio > 16 / 9) {
-				// Tela ultrawide ou muito larga
-				outputWidth = 3840;
-				outputHeight = Math.round(3840 / aspectRatio);
-			} else {
-				// Tela normal ou alta
-				outputHeight = 2160;
-				outputWidth = Math.round(2160 * aspectRatio);
-			}
-		} else {
-			// Para telas menores que 4K, usar dimensões originais
+		if (aspectRatio > 2.0) {
+			console.log("🖥️  Monitor ultrawide detectado - forçando largura máxima");
+			// Manter largura exata, pode ajustar altura se necessário
 			outputWidth = screenWidth;
 			outputHeight = screenHeight;
 		}
@@ -671,12 +776,14 @@ export class VideoComposer {
 		outputWidth = Math.round(outputWidth / 2) * 2;
 		outputHeight = Math.round(outputHeight / 2) * 2;
 
-		console.log("Configurações de resolução calculadas:", {
+		console.log("✅ Configurações de resolução calculadas (ULTRAWIDE):", {
 			original: `${screenWidth}x${screenHeight}`,
 			output: `${outputWidth}x${outputHeight}`,
 			aspectRatio: aspectRatio.toFixed(3),
-			originalAspectRatio: (screenWidth / screenHeight).toFixed(3),
 			outputAspectRatio: (outputWidth / outputHeight).toFixed(3),
+			isUltrawide: aspectRatio > 2.0,
+			isExactMatch:
+				screenWidth === outputWidth && screenHeight === outputHeight,
 		});
 
 		return {

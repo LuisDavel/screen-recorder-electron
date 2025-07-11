@@ -107,41 +107,57 @@ export class VideoHeaderComposer {
 		return this.stream;
 	}
 
-	// Ajustar dimensões do canvas para corresponder ao aspect ratio do vídeo
+	// Ajustar dimensões do canvas para corresponder EXATAMENTE ao vídeo
 	private adjustCanvasToVideoAspectRatio(): void {
 		if (this.video.readyState < 2) return;
 
 		const videoWidth = this.video.videoWidth;
 		const videoHeight = this.video.videoHeight;
 
-		if (!videoWidth || !videoHeight) return;
-
-		const videoAspectRatio = videoWidth / videoHeight;
-		const canvasAspectRatio = this.canvas.width / this.canvas.height;
-		const aspectRatioDiff = Math.abs(canvasAspectRatio - videoAspectRatio);
-
-		// Se a diferença for maior que 1%, ajustar o canvas
-		if (aspectRatioDiff > 0.01) {
-			console.log(
-				"🔧 HeaderComposer: Ajustando canvas para corresponder ao aspect ratio do vídeo...",
+		if (!videoWidth || !videoHeight) {
+			console.warn(
+				"⚠️ HeaderComposer: Dimensões do vídeo não disponíveis ainda",
 			);
-
-			// Manter a largura e ajustar a altura baseada no aspect ratio do vídeo
-			const newHeight = Math.round(this.canvas.width / videoAspectRatio);
-
-			// Garantir que seja par (requirement para codecs)
-			const adjustedHeight = Math.round(newHeight / 2) * 2;
-
-			console.log("📐 HeaderComposer: Ajuste de dimensões:", {
-				original: `${this.canvas.width}x${this.canvas.height}`,
-				adjusted: `${this.canvas.width}x${adjustedHeight}`,
-				originalAspectRatio: canvasAspectRatio.toFixed(3),
-				newAspectRatio: (this.canvas.width / adjustedHeight).toFixed(3),
-				videoAspectRatio: videoAspectRatio.toFixed(3),
-			});
-
-			this.canvas.height = adjustedHeight;
+			return;
 		}
+
+		console.log("🔍 HeaderComposer: Ajustando canvas para vídeo:", {
+			video: `${videoWidth}x${videoHeight}`,
+			canvas: `${this.canvas.width}x${this.canvas.height}`,
+			videoAspectRatio: (videoWidth / videoHeight).toFixed(3),
+			canvasAspectRatio: (this.canvas.width / this.canvas.height).toFixed(3),
+		});
+
+		// SEMPRE ajustar o canvas para corresponder EXATAMENTE às dimensões do vídeo
+		// Isso garante que não haverá distorção
+		let adjustedWidth = videoWidth;
+		let adjustedHeight = videoHeight;
+
+		// Garantir que sejam pares (requirement para codecs)
+		adjustedWidth = Math.round(adjustedWidth / 2) * 2;
+		adjustedHeight = Math.round(adjustedHeight / 2) * 2;
+
+		console.log(
+			"🔧 HeaderComposer: FORÇANDO ajuste do canvas para dimensões exatas do vídeo:",
+			{
+				original: `${this.canvas.width}x${this.canvas.height}`,
+				adjusted: `${adjustedWidth}x${adjustedHeight}`,
+				originalAspectRatio: (this.canvas.width / this.canvas.height).toFixed(
+					3,
+				),
+				newAspectRatio: (adjustedWidth / adjustedHeight).toFixed(3),
+				videoAspectRatio: (videoWidth / videoHeight).toFixed(3),
+			},
+		);
+
+		// Aplicar as novas dimensões
+		this.canvas.width = adjustedWidth;
+		this.canvas.height = adjustedHeight;
+
+		console.log(
+			"✅ HeaderComposer: Canvas ajustado com sucesso para:",
+			`${this.canvas.width}x${this.canvas.height}`,
+		);
 	}
 
 	private startComposition() {
@@ -169,6 +185,7 @@ export class VideoHeaderComposer {
 				const videoWidth = this.video.videoWidth || this.canvas.width;
 				const videoHeight = this.video.videoHeight || this.canvas.height;
 
+				// Verificação uma vez só para detectar problemas
 				if (!this.dimensionsLogged) {
 					const canvasAspectRatio = this.canvas.width / this.canvas.height;
 					const videoAspectRatio = videoWidth / videoHeight;
@@ -176,37 +193,66 @@ export class VideoHeaderComposer {
 						canvasAspectRatio - videoAspectRatio,
 					);
 
-					console.log("VideoHeaderComposer renderFrameContent:", {
-						canvasSize: {
-							width: this.canvas.width,
-							height: this.canvas.height,
-						},
-						videoSize: { width: videoWidth, height: videoHeight },
-						aspectRatio: {
+					console.log("🎬 HeaderComposer renderização:", {
+						canvas: `${this.canvas.width}x${this.canvas.height}`,
+						video: `${videoWidth}x${videoHeight}`,
+						aspectRatios: {
 							canvas: canvasAspectRatio.toFixed(3),
 							video: videoAspectRatio.toFixed(3),
-							difference: aspectRatioDiff.toFixed(3),
 						},
-						willDistort: aspectRatioDiff > 0.01,
+						distorção: aspectRatioDiff > 0.01 ? "⚠️ SIM" : "✅ NÃO",
 					});
-
-					if (aspectRatioDiff > 0.01) {
-						console.warn(
-							"⚠️  AVISO: Canvas e vídeo têm aspect ratios diferentes no HeaderComposer - pode haver distorção!",
-						);
-					}
 
 					this.dimensionsLogged = true;
 				}
 
-				// Desenhar vídeo ocupando todo o canvas sem distorção
-				// Se o canvas tem aspect ratio correto, usar dimensões diretas
+				// Desenhar vídeo FORÇANDO preenchimento total (crop/fill para eliminar achatamento)
+				// Calcular dimensões para preencher completamente o canvas
+				const canvasAspectRatio = this.canvas.width / this.canvas.height;
+				const videoAspectRatio = videoWidth / videoHeight;
+
+				let srcX = 0,
+					srcY = 0,
+					srcWidth = videoWidth,
+					srcHeight = videoHeight;
+
+				// Se o vídeo tem aspect ratio diferente, fazer crop para preencher
+				if (Math.abs(canvasAspectRatio - videoAspectRatio) > 0.01) {
+					console.log(
+						"🔧 HeaderComposer: Aplicando crop/fill para corrigir aspect ratio:",
+						{
+							canvas: `${this.canvas.width}x${this.canvas.height} (${canvasAspectRatio.toFixed(3)})`,
+							video: `${videoWidth}x${videoHeight} (${videoAspectRatio.toFixed(3)})`,
+						},
+					);
+
+					if (canvasAspectRatio > videoAspectRatio) {
+						// Canvas mais largo - cortar altura do vídeo
+						const targetHeight = videoWidth / canvasAspectRatio;
+						srcY = (videoHeight - targetHeight) / 2;
+						srcHeight = targetHeight;
+						console.log("📐 HeaderComposer: Cortando altura do vídeo:", {
+							srcY,
+							srcHeight,
+						});
+					} else {
+						// Canvas mais alto - cortar largura do vídeo
+						const targetWidth = videoHeight * canvasAspectRatio;
+						srcX = (videoWidth - targetWidth) / 2;
+						srcWidth = targetWidth;
+						console.log("📐 HeaderComposer: Cortando largura do vídeo:", {
+							srcX,
+							srcWidth,
+						});
+					}
+				}
+
 				this.ctx.drawImage(
 					this.video,
-					0,
-					0, // source x, y
-					videoWidth, // source width
-					videoHeight, // source height
+					srcX,
+					srcY, // source x, y (com crop)
+					srcWidth,
+					srcHeight, // source width, height (com crop)
 					0,
 					0, // destination x, y
 					this.canvas.width, // destination width
