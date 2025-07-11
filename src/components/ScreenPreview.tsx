@@ -11,6 +11,7 @@ import {
 import { CameraOverlay } from "./CameraOverlay";
 import { useHeaderConfigStore } from "@/store/store-header-config";
 import { PreviewHeader } from "./recording-header/PreviewHeader";
+import { PreviewFooter } from "./recording-header/PreviewFooter";
 
 interface ScreenSource {
 	id: string;
@@ -26,7 +27,7 @@ export function ScreenPreview() {
 	const videoRef = useRef<HTMLVideoElement>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const { setSourceId } = useSourceVideoStore();
-	const { headerConfig } = useHeaderConfigStore();
+	const { headerConfig, footerConfig } = useHeaderConfigStore();
 
 	const loadSources = useCallback(async () => {
 		try {
@@ -129,6 +130,14 @@ export function ScreenPreview() {
 					<PreviewHeader
 						isVisible={true}
 						className="absolute top-0 right-0 left-0 z-50"
+					/>
+				)}
+
+				{/* Footer informativo sobreposto - Preview específico */}
+				{selectedSourceId && footerConfig.isEnabled && (
+					<PreviewFooter
+						isVisible={true}
+						className="absolute bottom-0 right-0 left-0 z-30"
 					/>
 				)}
 			</div>

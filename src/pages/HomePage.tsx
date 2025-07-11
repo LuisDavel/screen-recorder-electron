@@ -12,6 +12,7 @@ import { useCameraConfigStore } from "@/store/store-camera-config";
 import { useMicrophoneConfigStore } from "@/store/store-microphone-config";
 import { usePermissionsInitializer } from "@/hooks/usePermissionsInitializer";
 import { HeaderConfig } from "@/components/recording-header/HeaderConfig";
+import { FooterConfig } from "@/components/recording-header/FooterConfig";
 import { PermissionsManager } from "@/components/PermissionsManager";
 import { useDeviceInitialization } from "@/hooks/useDeviceInitialization";
 import { useDeviceNotifications } from "@/hooks/useDeviceNotifications";
@@ -58,7 +59,10 @@ export default function HomePage() {
 				<>
 					<div className="grid w-full grid-cols-2 gap-8">
 						<ScreenPreview />
-						<HeaderConfig />
+						<div className="space-y-4">
+							<HeaderConfig />
+							<FooterConfig />
+						</div>
 					</div>
 					<div className="grid grid-cols-2 gap-8 w-full">
 						<div>

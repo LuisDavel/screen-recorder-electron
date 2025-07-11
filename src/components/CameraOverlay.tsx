@@ -52,7 +52,7 @@ export function CameraOverlay() {
 	return (
 		<div
 			className={cn(
-				"absolute z-10 overflow-hidden rounded-lg border-2 border-white/30 bg-black",
+				"absolute z-50 overflow-hidden rounded-lg border-2 border-white/30 bg-black",
 				positionClasses[position],
 				sizeClasses[size],
 			)}
@@ -61,7 +61,7 @@ export function CameraOverlay() {
 			{mainStream ? (
 				<video
 					ref={videoRef}
-					className="h-full w-full object-cover"
+					className="h-full w-full z-999 object-cover"
 					autoPlay
 					muted
 					playsInline

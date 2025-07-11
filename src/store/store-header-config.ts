@@ -15,10 +15,18 @@ export interface HeaderConfig {
 	externalId: string;
 }
 
+export interface FooterConfig {
+	isEnabled: boolean;
+	height: number;
+}
+
 interface HeaderConfigStore {
 	headerConfig: HeaderConfig;
 	updateHeaderConfig: (config: Partial<HeaderConfig>) => void;
 	resetHeaderConfig: () => void;
+	footerConfig: FooterConfig;
+	updateFooterConfig: (config: Partial<FooterConfig>) => void;
+	resetFooterConfig: () => void;
 }
 
 const defaultHeaderConfig: HeaderConfig = {
@@ -35,6 +43,11 @@ const defaultHeaderConfig: HeaderConfig = {
 	externalId: "Código/ID",
 };
 
+const defaultFooterConfig: FooterConfig = {
+	isEnabled: false,
+	height: 40,
+};
+
 export const useHeaderConfigStore = create<HeaderConfigStore>()(
 	persist(
 		(set) => ({
@@ -44,6 +57,12 @@ export const useHeaderConfigStore = create<HeaderConfigStore>()(
 					headerConfig: { ...state.headerConfig, ...config },
 				})),
 			resetHeaderConfig: () => set({ headerConfig: defaultHeaderConfig }),
+			footerConfig: defaultFooterConfig,
+			updateFooterConfig: (config) =>
+				set((state) => ({
+					footerConfig: { ...state.footerConfig, ...config },
+				})),
+			resetFooterConfig: () => set({ footerConfig: defaultFooterConfig }),
 		}),
 		{
 			name: "header-config-storage",

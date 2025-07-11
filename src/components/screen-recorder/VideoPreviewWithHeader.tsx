@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from "react";
 import { useHeaderConfigStore } from "@/store/store-header-config";
 import { PreviewHeader } from "../recording-header/PreviewHeader";
+import { PreviewFooter } from "../recording-header/PreviewFooter";
 
 interface VideoPreviewWithHeaderProps {
 	stream: MediaStream | null;
@@ -14,7 +15,7 @@ export default function VideoPreviewWithHeader({
 	className = "",
 }: VideoPreviewWithHeaderProps) {
 	const videoRef = useRef<HTMLVideoElement>(null);
-	const { headerConfig } = useHeaderConfigStore();
+	const { headerConfig, footerConfig } = useHeaderConfigStore();
 
 	useEffect(() => {
 		if (videoRef.current && stream) {
@@ -65,6 +66,14 @@ export default function VideoPreviewWithHeader({
 				<PreviewHeader
 					isVisible={true}
 					className="absolute top-0 right-0 left-0 z-50"
+				/>
+			)}
+
+			{/* Footer sobreposto na parte inferior - Preview específico */}
+			{stream && footerConfig.isEnabled && (
+				<PreviewFooter
+					isVisible={true}
+					className="absolute bottom-0 right-0 left-0 z-50"
 				/>
 			)}
 		</div>

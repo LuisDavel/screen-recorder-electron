@@ -9,8 +9,9 @@ import { useMicrophoneConfigStore } from "@/store/store-microphone-config";
 import { saveRecording, saveToLocation } from "./screen_recorder_helpers";
 import { recordingMonitor } from "./recording-monitor";
 import { VideoHeaderComposer } from "./video-header-composer";
+import { VideoFooterComposer } from "./video-footer-composer";
 
-import type { HeaderConfig } from "@/store/store-header-config";
+import type { HeaderConfig, FooterConfig } from "@/store/store-header-config";
 
 export interface AdvancedRecordingOptions {
 	sourceId: string;
@@ -19,6 +20,8 @@ export interface AdvancedRecordingOptions {
 	includeMicrophone?: boolean;
 	includeHeader?: boolean;
 	headerConfig?: HeaderConfig;
+	includeFooter?: boolean;
+	footerConfig?: FooterConfig;
 	outputWidth?: number;
 	outputHeight?: number;
 	frameRate?: number;
@@ -33,6 +36,7 @@ export class AdvancedScreenRecorderManager {
 	private audioStream: MediaStream | null = null;
 	private videoComposer: VideoComposer | null = null;
 	private headerComposer: VideoHeaderComposer | null = null;
+	private footerComposer: VideoFooterComposer | null = null;
 	private finalStream: MediaStream | null = null;
 	private isRecording = false;
 	private options: AdvancedRecordingOptions | null = null;
@@ -319,6 +323,78 @@ export class AdvancedScreenRecorderManager {
 			}
 		} else {
 			console.log("Header não será aplicado - condições não atendidas");
+		}
+
+		// Apply footer if needed
+		console.log("🔍 DEBUG: Verificando se deve aplicar footer:", {
+			includeFooter: options.includeFooter,
+			footerEnabled: options.footerConfig?.isEnabled,
+			footerConfig: options.footerConfig,
+			hasFooterComposer: !!this.footerComposer,
+		});
+
+		if (options.includeFooter && options.footerConfig?.isEnabled) {
+			try {
+				console.log("Aplicando footer ao vídeo");
+
+				this.footerComposer = new VideoFooterComposer(options.footerConfig);
+
+				// Get correct dimensions from the current stream (after header is applied)
+				let width: number;
+				let height: number;
+
+				// Get dimensions from the current stream video track
+				const currentVideoTrack = currentStream.getVideoTracks()[0];
+				if (currentVideoTrack) {
+					const trackSettings = currentVideoTrack.getSettings();
+					width = trackSettings.width || 1920;
+					height = trackSettings.height || 1080;
+					console.log("Usando dimensões do stream atual para footer:", {
+						width,
+						height,
+						trackId: currentVideoTrack.id,
+					});
+				} else {
+					// Fallback para dimensões do VideoComposer ou tela original
+					if (this.videoComposer) {
+						const composerSettings = this.videoComposer.getSettings();
+						width = composerSettings.outputWidth;
+						height = composerSettings.outputHeight;
+					} else {
+						const screenTrack = this.screenStream?.getVideoTracks()[0];
+						const screenSettings = screenTrack?.getSettings();
+						width = screenSettings?.width || 1920;
+						height = screenSettings?.height || 1080;
+					}
+					console.log("Usando dimensões fallback para footer:", {
+						width,
+						height,
+					});
+				}
+
+				console.log("Dimensões finais do vídeo para footer:", {
+					width,
+					height,
+				});
+				console.log("Configurações do footer:", options.footerConfig);
+
+				currentStream = await this.footerComposer.composeWithFooter(
+					currentStream,
+					width,
+					height,
+				);
+
+				console.log("🔍 DEBUG: Footer aplicado com sucesso, novo stream:", {
+					streamId: currentStream.id,
+					videoTracks: currentStream.getVideoTracks().length,
+					audioTracks: currentStream.getAudioTracks().length,
+					videoTrackSettings: currentStream.getVideoTracks()[0]?.getSettings(),
+				});
+			} catch (error) {
+				console.error("Erro ao aplicar footer:", error);
+			}
+		} else {
+			console.log("Footer não será aplicado - condições não atendidas");
 		}
 
 		// Finally, add audio if available
@@ -637,6 +713,13 @@ export class AdvancedScreenRecorderManager {
 			console.log("HeaderComposer limpo");
 		}
 
+		// Parar compositor de footer
+		if (this.footerComposer) {
+			this.footerComposer.stop();
+			this.footerComposer = null;
+			console.log("FooterComposer limpo");
+		}
+
 		// Parar streams
 		if (this.screenStream) {
 			this.screenStream.getTracks().forEach((track) => {
@@ -727,11 +810,12 @@ export class AdvancedScreenRecorderManager {
 
 	// Método estático para verificar suporte
 	public static isSupported(): boolean {
-		return !!(
-			navigator.mediaDevices &&
-			navigator.mediaDevices.getUserMedia &&
-			window.MediaRecorder &&
-			VideoComposer.isSupported()
+		return (
+			typeof navigator !== "undefined" &&
+			!!navigator.mediaDevices &&
+			!!navigator.mediaDevices.getUserMedia &&
+			typeof window !== "undefined" &&
+			!!window.MediaRecorder
 		);
 	}
 
@@ -747,6 +831,8 @@ export class AdvancedScreenRecorderManager {
 			includeMicrophone: true,
 			includeHeader: false,
 			headerConfig: undefined,
+			includeFooter: false,
+			footerConfig: undefined,
 			// Remover configurações fixas de resolução - será detectado automaticamente
 			outputWidth: undefined,
 			outputHeight: undefined,

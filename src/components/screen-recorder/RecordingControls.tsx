@@ -40,13 +40,14 @@ export function RecordingControls({
 	const [includeCameraOverlay, setIncludeCameraOverlay] = useState(false);
 	const [includeMicrophone, setIncludeMicrophone] = useState(false);
 	const [includeHeader, setIncludeHeader] = useState(false);
+	const [includeFooter, setIncludeFooter] = useState(false);
 
 	// Camera store e notifications
 	const { isEnabled: cameraEnabled, mainStream: cameraStream } =
 		useCameraConfigStore();
 	const { isEnabled: microphoneEnabled, mainStream: microphoneStream } =
 		useMicrophoneConfigStore();
-	const { headerConfig } = useHeaderConfigStore();
+	const { headerConfig, footerConfig } = useHeaderConfigStore();
 	const { showSuccess, showError, showInfo } = useToastHelpers();
 
 	// Timer para mostrar o tempo de gravação
@@ -163,6 +164,8 @@ export function RecordingControls({
 			options.includeMicrophone = includeMicrophone && microphoneEnabled;
 			options.includeHeader = includeHeader && headerConfig.isEnabled;
 			options.headerConfig = headerConfig;
+			options.includeFooter = includeFooter && footerConfig.isEnabled;
+			options.footerConfig = footerConfig;
 
 			await recorder.startRecording(options);
 			setIsRecording(true);
@@ -176,6 +179,9 @@ export function RecordingControls({
 			}
 			if (includeHeader && headerConfig.isEnabled) {
 				message += " com header informativo";
+			}
+			if (includeFooter && footerConfig.isEnabled) {
+				message += " com footer";
 			}
 			showSuccess(message);
 		} catch (error) {
@@ -360,6 +366,36 @@ export function RecordingControls({
 								checked={includeHeader}
 								onCheckedChange={setIncludeHeader}
 								disabled={!headerConfig.isEnabled}
+							/>
+						</div>
+					)}
+
+					{/* Footer Option */}
+					{!isRecording && (
+						<div className="bg-muted/50 flex items-center justify-between rounded-xl p-4 backdrop-blur-sm">
+							<div className="flex items-center space-x-3">
+								<Square
+									className={`h-4 w-4 ${includeFooter && footerConfig.isEnabled ? "text-blue-600" : "text-gray-400"}`}
+								/>
+								<div className="flex flex-col">
+									<Label
+										htmlFor="footer-overlay"
+										className="text-sm font-medium"
+									>
+										Incluir footer (rodapé)
+									</Label>
+									<span className="text-muted-foreground text-xs">
+										{footerConfig.isEnabled
+											? "Footer será adicionado na parte inferior do vídeo"
+											: "Configure o footer nas configurações"}
+									</span>
+								</div>
+							</div>
+							<Switch
+								id="footer-overlay"
+								checked={includeFooter}
+								onCheckedChange={setIncludeFooter}
+								disabled={!footerConfig.isEnabled}
 							/>
 						</div>
 					)}
