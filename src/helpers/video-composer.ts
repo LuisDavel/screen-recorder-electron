@@ -297,75 +297,14 @@ export class VideoComposer {
 					this.dimensionsLogged = true;
 				}
 
-				// Desenhar vídeo FORÇANDO preenchimento total (crop/fill para eliminar achatamento)
-				// Calcular dimensões para preencher completamente o canvas
-				const canvasAspectRatio = this.canvas.width / this.canvas.height;
-				const videoAspectRatio = videoWidth / videoHeight;
-
-				let srcX = 0,
-					srcY = 0,
-					srcWidth = videoWidth,
-					srcHeight = videoHeight;
-
-				// Se o vídeo tem aspect ratio diferente, fazer crop para preencher
-				if (Math.abs(canvasAspectRatio - videoAspectRatio) > 0.01) {
-					console.log("🔧 Aplicando crop/fill para corrigir aspect ratio:", {
-						canvas: `${this.canvas.width}x${this.canvas.height} (${canvasAspectRatio.toFixed(3)})`,
-						video: `${videoWidth}x${videoHeight} (${videoAspectRatio.toFixed(3)})`,
-					});
-
-					// CORREÇÃO ESPECIAL: Para monitores ultrawide com captura de tela sem foco
-					const isUltrawideCanvas = canvasAspectRatio > 2.0;
-					const isNormalVideo = videoAspectRatio < 2.0;
-
-					if (isUltrawideCanvas && isNormalVideo && videoWidth > 1920) {
-						console.log(
-							"🚨 APLICANDO CORREÇÃO AGRESSIVA para captura sem foco ultrawide",
-						);
-
-						// Para monitors ultrawide, forçar crop mais agressivo na altura
-						// Usar mais da largura disponível do vídeo
-						const targetHeight = (videoWidth / canvasAspectRatio) * 0.8; // Use 80% da altura calculada
-						srcY = Math.max(0, (videoHeight - targetHeight) / 2);
-						srcHeight = Math.min(videoHeight, targetHeight);
-						srcX = 0;
-						srcWidth = videoWidth;
-
-						console.log(
-							"📐 CORREÇÃO AGRESSIVA - Cortando altura com mais força:",
-							{
-								srcX,
-								srcY,
-								srcWidth,
-								srcHeight,
-								percentualUsado:
-									((srcHeight / videoHeight) * 100).toFixed(1) + "%",
-							},
-						);
-					} else if (canvasAspectRatio > videoAspectRatio) {
-						// Canvas mais largo - cortar altura do vídeo (comportamento normal)
-						const targetHeight = videoWidth / canvasAspectRatio;
-						srcY = (videoHeight - targetHeight) / 2;
-						srcHeight = targetHeight;
-						console.log("📐 Cortando altura do vídeo (normal):", {
-							srcY,
-							srcHeight,
-						});
-					} else {
-						// Canvas mais alto - cortar largura do vídeo
-						const targetWidth = videoHeight * canvasAspectRatio;
-						srcX = (videoWidth - targetWidth) / 2;
-						srcWidth = targetWidth;
-						console.log("📐 Cortando largura do vídeo:", { srcX, srcWidth });
-					}
-				}
-
+				// Desenhar vídeo preservando aspect ratio original (sem crop/fill forçado)
+				// Como o canvas já tem as dimensões exatas do vídeo, desenhar diretamente
 				this.ctx.drawImage(
 					this.screenVideo,
-					srcX,
-					srcY, // source x, y (com crop)
-					srcWidth,
-					srcHeight, // source width, height (com crop)
+					0,
+					0, // source x, y (usar vídeo completo)
+					videoWidth,
+					videoHeight, // source width, height (usar vídeo completo)
 					0,
 					0, // destination x, y
 					this.canvas.width, // destination width
@@ -429,15 +368,6 @@ export class VideoComposer {
 				if (!this.cameraVideo || this.cameraVideo.readyState >= 2) {
 					// Ajustar canvas para corresponder ao aspect ratio do vídeo
 					this.adjustCanvasToVideoAspectRatio();
-
-					// Para monitores ultrawide, forçar aspect ratio específico
-					const aspectRatio = this.canvas.width / this.canvas.height;
-					if (aspectRatio > 2.0) {
-						console.log(
-							"🖥️ Monitor ultrawide detectado - aplicando correção forçada",
-						);
-						this.forceUltrawideAspectRatio();
-					}
 
 					// Start appropriate rendering method
 					if (this.isPageVisible) {
@@ -628,59 +558,30 @@ export class VideoComposer {
 			canvasAspectRatio: canvasAspectRatio.toFixed(3),
 		});
 
-		// DETECÇÃO ESPECIAL: Captura de tela sem foco de aplicação
-		// Se detectarmos aspect ratio "normal" mas canvas ultrawide, é provável que seja o problema
-		if (
-			videoAspectRatio < 2.0 &&
-			canvasAspectRatio > 2.0 &&
-			videoWidth > 1920
-		) {
-			console.warn(
-				"🚨 DETECTADO: Problema de captura de tela sem foco de aplicação!",
-			);
-			console.log("📱 Aplicando correção forçada para monitor ultrawide...");
+		// SEMPRE usar as dimensões exatas do vídeo para evitar achatamento
+		let adjustedWidth = videoWidth;
+		let adjustedHeight = videoHeight;
 
-			// Forçar dimensões ultrawide baseadas na largura do vídeo
-			const forcedHeight = Math.round(videoWidth / 2.35); // Force 21:9 ratio
-			const adjustedWidth = videoWidth;
-			const adjustedHeight = Math.round(forcedHeight / 2) * 2; // Garantir par
+		// Garantir que sejam pares (requirement para codecs)
+		adjustedWidth = Math.round(adjustedWidth / 2) * 2;
+		adjustedHeight = Math.round(adjustedHeight / 2) * 2;
 
-			console.log("🔧 CORREÇÃO FORÇADA para captura sem foco:", {
-				original: `${this.canvas.width}x${this.canvas.height}`,
-				videoOriginal: `${videoWidth}x${videoHeight}`,
-				corrigido: `${adjustedWidth}x${adjustedHeight}`,
-				novoAspectRatio: (adjustedWidth / adjustedHeight).toFixed(3),
-			});
+		console.log("🔧 Usando dimensões exatas do vídeo (SEM correção forçada):", {
+			original: `${this.canvas.width}x${this.canvas.height}`,
+			adjusted: `${adjustedWidth}x${adjustedHeight}`,
+			originalAspectRatio: canvasAspectRatio.toFixed(3),
+			newAspectRatio: (adjustedWidth / adjustedHeight).toFixed(3),
+			videoAspectRatio: videoAspectRatio.toFixed(3),
+			preservandoAspectRatio: "SIM - usando dimensões exatas do vídeo",
+		});
 
-			this.canvas.width = adjustedWidth;
-			this.canvas.height = adjustedHeight;
-			this.options.outputWidth = adjustedWidth;
-			this.options.outputHeight = adjustedHeight;
-		} else {
-			// Comportamento normal - usar dimensões exatas do vídeo
-			let adjustedWidth = videoWidth;
-			let adjustedHeight = videoHeight;
-
-			// Garantir que sejam pares (requirement para codecs)
-			adjustedWidth = Math.round(adjustedWidth / 2) * 2;
-			adjustedHeight = Math.round(adjustedHeight / 2) * 2;
-
-			console.log("🔧 Ajuste normal do canvas:", {
-				original: `${this.canvas.width}x${this.canvas.height}`,
-				adjusted: `${adjustedWidth}x${adjustedHeight}`,
-				originalAspectRatio: canvasAspectRatio.toFixed(3),
-				newAspectRatio: (adjustedWidth / adjustedHeight).toFixed(3),
-				videoAspectRatio: videoAspectRatio.toFixed(3),
-			});
-
-			this.canvas.width = adjustedWidth;
-			this.canvas.height = adjustedHeight;
-			this.options.outputWidth = adjustedWidth;
-			this.options.outputHeight = adjustedHeight;
-		}
+		this.canvas.width = adjustedWidth;
+		this.canvas.height = adjustedHeight;
+		this.options.outputWidth = adjustedWidth;
+		this.options.outputHeight = adjustedHeight;
 
 		console.log(
-			"✅ Canvas ajustado com sucesso para:",
+			"✅ Canvas ajustado para dimensões exatas do vídeo:",
 			`${this.canvas.width}x${this.canvas.height}`,
 		);
 	}

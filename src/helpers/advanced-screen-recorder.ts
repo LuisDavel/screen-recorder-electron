@@ -1,5 +1,9 @@
 import { Buffer } from "buffer";
-import { VideoComposer, createVideoComposer } from "./video-composer";
+import {
+	VideoComposer,
+	type CameraPositionType,
+	type CameraSizeType,
+} from "./video-composer";
 import { useCameraConfigStore } from "@/store/store-camera-config";
 import { useMicrophoneConfigStore } from "@/store/store-microphone-config";
 import { saveRecording, saveToLocation } from "./screen_recorder_helpers";
@@ -225,17 +229,41 @@ export class AdvancedScreenRecorderManager {
 			try {
 				const cameraStore = useCameraConfigStore.getState();
 
-				this.videoComposer = await createVideoComposer(
-					currentStream,
-					cameraStream,
-					cameraStore.position as any,
-					cameraStore.size as any,
-					null, // Audio will be added later
-				);
+				// Obter dimensões do stream da tela para configurar o VideoComposer
+				const screenTrack = screenStream.getVideoTracks()[0];
+				const screenSettings = screenTrack.getSettings();
+				const screenWidth = screenSettings.width || 1920;
+				const screenHeight = screenSettings.height || 1080;
+
+				console.log("Configurando VideoComposer com dimensões preservadas:", {
+					screenWidth,
+					screenHeight,
+					aspectRatio: (screenWidth / screenHeight).toFixed(3),
+				});
+
+				// Criar compositor com dimensões específicas se fornecidas nas opções
+				const composerOptions = {
+					screenStream: currentStream,
+					cameraStream: cameraStream,
+					cameraPosition: cameraStore.position as CameraPositionType,
+					cameraSize: cameraStore.size as CameraSizeType,
+					audioStream: undefined, // Audio will be added later
+					outputWidth: options.outputWidth || screenWidth,
+					outputHeight: options.outputHeight || screenHeight,
+					frameRate: options.frameRate || 30,
+				};
+
+				this.videoComposer = new VideoComposer(composerOptions);
 
 				currentStream = this.videoComposer.startComposition();
 
-				console.log("Compositor de câmera configurado com sucesso");
+				console.log("Compositor de câmera configurado com sucesso", {
+					outputWidth: composerOptions.outputWidth,
+					outputHeight: composerOptions.outputHeight,
+					aspectRatio: (
+						composerOptions.outputWidth / composerOptions.outputHeight
+					).toFixed(3),
+				});
 			} catch (error) {
 				console.error("Erro ao configurar compositor de câmera:", error);
 			}
@@ -690,8 +718,8 @@ export class AdvancedScreenRecorderManager {
 
 		const cameraStore = useCameraConfigStore.getState();
 		this.videoComposer.updateCameraSettings(
-			cameraStore.position as any,
-			cameraStore.size as any,
+			cameraStore.position as CameraPositionType,
+			cameraStore.size as CameraSizeType,
 		);
 
 		console.log("Configurações da câmera atualizadas durante gravação");
