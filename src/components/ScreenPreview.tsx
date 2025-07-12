@@ -55,7 +55,7 @@ export function ScreenPreview() {
 	}, []);
 
 	const getScreenStream = useCallback(async () => {
-		if (!selectedSourceId) return;
+		if (!selectedSourceId) return null;
 
 		try {
 			const constraints = {
@@ -76,9 +76,11 @@ export function ScreenPreview() {
 			}
 
 			setError(null);
+			return stream;
 		} catch (err) {
 			setError("Erro ao capturar tela");
 			console.error("Erro ao capturar tela:", err);
+			return null;
 		}
 	}, [selectedSourceId]);
 
@@ -103,8 +105,6 @@ export function ScreenPreview() {
 
 	// Update stream when source changes
 	useEffect(() => {
-		let stream: MediaStream | null = null;
-
 		if (selectedSourceId) {
 			if (selectedSourceId === "camera-only") {
 				// Para câmera apenas, usar o stream da câmera
@@ -116,15 +116,21 @@ export function ScreenPreview() {
 		}
 
 		return () => {
+			// Só parar streams de tela criados especificamente para preview
+			// NUNCA parar o stream da câmera, pois ele é gerenciado pelo store
 			if (videoRef.current && videoRef.current.srcObject) {
-				stream = videoRef.current.srcObject as MediaStream;
-				// Não parar o stream da câmera, pois ele é gerenciado pelo store
-				if (selectedSourceId !== "camera-only") {
-					stream.getTracks().forEach((track) => track.stop());
+				const currentStream = videoRef.current.srcObject as MediaStream;
+
+				// Só parar se for um stream de tela (não da câmera)
+				if (
+					selectedSourceId !== "camera-only" &&
+					currentStream !== cameraStream
+				) {
+					currentStream.getTracks().forEach((track) => track.stop());
 				}
 			}
 		};
-	}, [selectedSourceId, getScreenStream, getCameraStream]);
+	}, [selectedSourceId, getScreenStream, getCameraStream, cameraStream]);
 
 	const handleSourceChange = useCallback(
 		(value: string) => {

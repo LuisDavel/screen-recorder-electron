@@ -56,6 +56,8 @@ export interface CameraConfigActions {
 	stopMainStream: () => void;
 	// Reconnect method for when returning to the page
 	reconnectCamera: () => Promise<void>;
+	// Check if camera stream is still active and reconnect if needed
+	checkAndReconnectCamera: () => Promise<void>;
 	// Notification callbacks
 	onSuccess?: (message: string) => void;
 	onError?: (message: string) => void;
@@ -96,7 +98,36 @@ export const useCameraConfigStore = create<CameraConfigStore>()(
 			setIsEnabled: (isEnabled) => set({ isEnabled }),
 			setPosition: (position) => set({ position }),
 			setSize: (size) => set({ size }),
-			setMainStream: (stream) => set({ mainStream: stream }),
+			setMainStream: (stream) => {
+				console.log("🎥 Camera stream change:", {
+					hasStream: !!stream,
+					streamId: stream?.id,
+					tracks: stream?.getTracks().length,
+					activeTracksCount: stream
+						?.getTracks()
+						.filter((t) => t.readyState === "live").length,
+					previousStreamId: get().mainStream?.id,
+					stackTrace: new Error().stack
+						?.split("\n")
+						.slice(1, 6)
+						.map((line) => line.trim())
+						.join(" <- "),
+				});
+
+				// Aviso se alguém está removendo o stream quando deveria estar ativo
+				if (!stream && get().isEnabled && get().selectedDeviceId) {
+					console.warn(
+						"⚠️ ATENÇÃO: Stream da câmera está sendo removido quando deveria estar ativo!",
+						{
+							isEnabled: get().isEnabled,
+							selectedDeviceId: get().selectedDeviceId,
+							wasActive: !!get().mainStream,
+						},
+					);
+				}
+
+				set({ mainStream: stream });
+			},
 			setIsLoading: (isLoading) => set({ isLoading }),
 			setIsInitializing: (initializing) =>
 				set({ isInitializing: initializing }),
@@ -186,6 +217,26 @@ export const useCameraConfigStore = create<CameraConfigStore>()(
 				// Only reconnect if enabled, has device selected, and no current stream
 				if (isEnabled && selectedDeviceId && !mainStream) {
 					console.log("Reconnecting camera...");
+					await get().initializeMainStream();
+				}
+			},
+
+			// Check if camera stream is still active and reconnect if needed
+			checkAndReconnectCamera: async () => {
+				const { isEnabled, selectedDeviceId, mainStream } = get();
+
+				if (!isEnabled || !selectedDeviceId) {
+					return;
+				}
+
+				// Check if stream exists and is still active
+				const streamActive =
+					mainStream &&
+					mainStream.getTracks().length > 0 &&
+					mainStream.getTracks().some((track) => track.readyState === "live");
+
+				if (!streamActive) {
+					console.log("🔄 Camera stream not active, attempting reconnect...");
 					await get().initializeMainStream();
 				}
 			},

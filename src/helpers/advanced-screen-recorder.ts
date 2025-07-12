@@ -904,62 +904,92 @@ export class AdvancedScreenRecorderManager {
 
 	// Limpar recursos
 	private async cleanup(): Promise<void> {
-		console.log("Limpando recursos do gravador avançado");
+		console.log("🧹 Limpando recursos do gravador avançado");
+
+		// Salvar referências dos streams originais antes de limpá-las
+		const originalCameraStream = this.cameraStream;
+		const originalAudioStream = this.audioStream;
+		const originalScreenStream = this.screenStream;
 
 		// Parar compositor
 		if (this.videoComposer) {
 			this.videoComposer.stopComposition();
 			this.videoComposer.dispose();
 			this.videoComposer = null;
-			console.log("VideoComposer limpo");
+			console.log("✅ VideoComposer limpo");
 		}
 
 		// Parar compositor de header
 		if (this.headerComposer) {
 			this.headerComposer.stop();
 			this.headerComposer = null;
-			console.log("HeaderComposer limpo");
+			console.log("✅ HeaderComposer limpo");
 		}
 
 		// Parar compositor de footer
 		if (this.footerComposer) {
 			this.footerComposer.stop();
 			this.footerComposer = null;
-			console.log("FooterComposer limpo");
+			console.log("✅ FooterComposer limpo");
 		}
 
-		// Parar streams
+		// Parar APENAS o stream da tela (que é criado para gravação)
 		if (this.screenStream) {
 			this.screenStream.getTracks().forEach((track) => {
 				track.stop();
-				console.log("Track da tela parado:", track.id);
+				console.log("🖥️ Track da tela parado:", track.id);
 			});
 			this.screenStream = null;
 		}
 
-		// Não parar o stream da câmera pois ele é gerenciado pelo store
-		this.cameraStream = null;
-
-		// IMPORTANTE: Não parar o stream do microfone aqui pois ele é gerenciado pelo store
-		// e precisa continuar ativo para próximas gravações
-		this.audioStream = null;
-		console.log("Stream de áudio desvinculado (não parado)");
-
-		// Limpar final stream se for diferente do screen stream
-		if (this.finalStream && this.finalStream !== this.screenStream) {
-			// Só parar tracks que não sejam do microfone ou câmera (que são gerenciados pelos stores)
-			this.finalStream.getVideoTracks().forEach((track) => {
-				// Só parar se não for track original da tela (que já foi parado acima)
-				if (
-					this.screenStream &&
-					!this.screenStream.getVideoTracks().includes(track)
-				) {
-					track.stop();
-					console.log("Track de vídeo final parado:", track.id);
-				}
-			});
+		// NUNCA parar o stream da câmera - apenas desreferenciar
+		if (this.cameraStream) {
+			console.log("📷 Stream da câmera preservado (gerenciado pelo store)");
+			this.cameraStream = null;
 		}
-		this.finalStream = null;
+
+		// NUNCA parar o stream do microfone - apenas desreferenciar
+		if (this.audioStream) {
+			console.log("🎤 Stream do microfone preservado (gerenciado pelo store)");
+			this.audioStream = null;
+		}
+
+		// Para o finalStream, NUNCA parar tracks que podem ser da câmera ou microfone
+		// Só parar se for um stream composto criado especificamente para gravação
+		if (this.finalStream) {
+			// Se o finalStream é diferente de todos os streams originais,
+			// significa que é um stream composto que pode ser parado
+			const isComposedStream =
+				this.finalStream !== originalScreenStream &&
+				this.finalStream !== originalCameraStream &&
+				this.finalStream !== originalAudioStream;
+
+			if (isComposedStream) {
+				// Para um stream composto, verificar cada track individualmente
+				this.finalStream.getTracks().forEach((track) => {
+					// Verificar se a track NÃO é das stores originais
+					const isFromCameraStore = originalCameraStream
+						?.getTracks()
+						.includes(track);
+					const isFromAudioStore = originalAudioStream
+						?.getTracks()
+						.includes(track);
+
+					if (!isFromCameraStore && !isFromAudioStore) {
+						track.stop();
+						console.log("🎬 Track composta parada:", track.id, track.kind);
+					} else {
+						console.log("⚠️ Track preservada (do store):", track.id, track.kind);
+					}
+				});
+			} else {
+				console.log(
+					"🔄 FinalStream é referência de stream original - não parado",
+				);
+			}
+
+			this.finalStream = null;
+		}
 
 		// Limpar MediaRecorder
 		this.mediaRecorder = null;
@@ -967,9 +997,7 @@ export class AdvancedScreenRecorderManager {
 		this.isRecording = false;
 		this.options = null;
 
-		console.log(
-			"Limpeza concluída - streams do microfone e câmera preservados",
-		);
+		console.log("✅ Limpeza concluída - streams dos stores preservados");
 	}
 
 	// Obter status da gravação

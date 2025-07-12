@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Settings, AlertCircle } from "lucide-react";
@@ -55,6 +55,19 @@ export default function HomePage() {
 	const handleReconnectDevices = useCallback(async () => {
 		await reconnectDevices();
 	}, [reconnectDevices]);
+
+	// Effect to reconnect camera when page is mounted
+	useEffect(() => {
+		const timer = setTimeout(() => {
+			// Force reconnect camera if it's enabled but has no stream
+			if (cameraEnabled && !mainStream) {
+				console.log("🔄 HomePage: Tentando reconectar câmera...");
+				handleReconnectDevices();
+			}
+		}, 1000);
+
+		return () => clearTimeout(timer);
+	}, [cameraEnabled, mainStream, handleReconnectDevices]);
 
 	return (
 		<div className="flex h-full flex-col gap-6 p-6">

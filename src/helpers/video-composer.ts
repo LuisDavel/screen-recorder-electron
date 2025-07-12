@@ -540,7 +540,7 @@ export class VideoComposer {
 
 	// Parar composição
 	public stopComposition(): void {
-		console.log("Parando composição de vídeo");
+		console.log("🛑 Parando composição de vídeo");
 		this.isComposing = false;
 
 		// Clear animation frame
@@ -558,12 +558,29 @@ export class VideoComposer {
 		this.useTimer = false;
 
 		if (this.composedStream) {
+			// NUNCA parar tracks que vêm dos stores originais (câmera e microfone)
+			// Apenas parar tracks de vídeo criadas para composição
 			this.composedStream.getTracks().forEach((track) => {
-				track.stop();
-				console.log("Track do stream composto parado");
+				// Verificar se a track é de uma fonte original (store)
+				const isFromCameraStore = this.options.cameraStream
+					?.getTracks()
+					.includes(track);
+				const isFromAudioStore = this.options.audioStream
+					?.getTracks()
+					.includes(track);
+
+				if (!isFromCameraStore && !isFromAudioStore) {
+					// Só parar tracks que não são dos stores (ex: tracks de canvas/composição)
+					track.stop();
+					console.log("🎬 Track de composição parada:", track.kind, track.id);
+				} else {
+					console.log("⚠️ Track preservada (do store):", track.kind, track.id);
+				}
 			});
 			this.composedStream = null;
 		}
+
+		console.log("✅ Composição parada - streams dos stores preservados");
 	}
 
 	// Atualizar stream da câmera
@@ -606,7 +623,7 @@ export class VideoComposer {
 
 	// Atualizar stream de áudio
 	public updateAudioStream(audioStream: MediaStream | null): void {
-		console.log("Atualizando stream de áudio", {
+		console.log("🔄 Atualizando stream de áudio", {
 			hasAudioStream: !!audioStream,
 		});
 		this.options.audioStream = audioStream;
@@ -615,15 +632,22 @@ export class VideoComposer {
 		if (this.composedStream && this.isComposing) {
 			const newAudioTracks = audioStream ? audioStream.getAudioTracks() : [];
 
-			// Parar tracks de áudio antigos
+			// Remover tracks de áudio antigos SEM pará-los (eles podem ser do store)
 			this.composedStream.getAudioTracks().forEach((track) => {
-				track.stop();
 				this.composedStream?.removeTrack(track);
+				console.log(
+					"🎤 Track de áudio removido do stream composto (não parado):",
+					track.id,
+				);
 			});
 
 			// Adicionar novos tracks de áudio
 			newAudioTracks.forEach((track) => {
 				this.composedStream?.addTrack(track);
+				console.log(
+					"🎤 Track de áudio adicionado ao stream composto:",
+					track.id,
+				);
 			});
 		}
 	}

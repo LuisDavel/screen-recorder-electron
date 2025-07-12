@@ -1,19 +1,12 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useCameraConfigStore } from "@/store/store-camera-config";
 import { cn } from "@/utils/tailwind";
-import { useDeviceInitialization } from "@/hooks/useDeviceInitialization";
 
 export function CameraOverlay() {
 	const { isEnabled, position, size, mainStream } = useCameraConfigStore();
 
 	const videoRef = useRef<HTMLVideoElement>(null);
 	const [openConfig, setOpenConfig] = useState(false);
-
-	// Use the new centralized device initialization hook
-	useDeviceInitialization({
-		devices: ["camera"],
-		autoInitialize: true,
-	});
 
 	// Update video element when stream changes
 	useEffect(() => {

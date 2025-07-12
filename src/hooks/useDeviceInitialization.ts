@@ -36,6 +36,10 @@ export interface UseDeviceInitializationReturn {
 	reconnectDevices: () => Promise<void>;
 }
 
+// Global locks to prevent multiple simultaneous initializations
+let cameraInitializationLock = false;
+let microphoneInitializationLock = false;
+
 export function useDeviceInitialization(
 	options: UseDeviceInitializationOptions = {},
 ): UseDeviceInitializationReturn {
@@ -66,6 +70,16 @@ export function useDeviceInitialization(
 				};
 			}
 
+			// Check if already initializing
+			if (cameraInitializationLock) {
+				console.log("Camera initialization already in progress, skipping...");
+				return {
+					success: false,
+					error: "Inicialização da câmera já em andamento",
+				};
+			}
+
+			cameraInitializationLock = true;
 			setCameraError(null);
 
 			try {
@@ -85,6 +99,8 @@ export function useDeviceInitialization(
 					error instanceof Error ? error.message : String(error);
 				setCameraError(errorMessage);
 				return { success: false, error: errorMessage };
+			} finally {
+				cameraInitializationLock = false;
 			}
 		}, [devices, retryAttempts, retryDelay]);
 
@@ -98,6 +114,18 @@ export function useDeviceInitialization(
 				};
 			}
 
+			// Check if already initializing
+			if (microphoneInitializationLock) {
+				console.log(
+					"Microphone initialization already in progress, skipping...",
+				);
+				return {
+					success: false,
+					error: "Inicialização do microfone já em andamento",
+				};
+			}
+
+			microphoneInitializationLock = true;
 			setMicrophoneError(null);
 
 			try {
@@ -117,6 +145,8 @@ export function useDeviceInitialization(
 					error instanceof Error ? error.message : String(error);
 				setMicrophoneError(errorMessage);
 				return { success: false, error: errorMessage };
+			} finally {
+				microphoneInitializationLock = false;
 			}
 		}, [devices, retryAttempts, retryDelay]);
 
@@ -155,9 +185,12 @@ export function useDeviceInitialization(
 		setMicrophoneInitialized(false);
 		setMicrophoneError(null);
 		deviceInitializationManager.reset();
+		// Reset locks
+		cameraInitializationLock = false;
+		microphoneInitializationLock = false;
 	}, []);
 
-	// Auto-initialize when devices are enabled
+	// Auto-initialize when devices are enabled (with debounce)
 	useEffect(() => {
 		if (!autoInitialize) return;
 
@@ -166,14 +199,16 @@ export function useDeviceInitialization(
 			cameraStore.isEnabled &&
 			cameraStore.selectedDeviceId &&
 			!cameraStore.mainStream &&
-			!cameraStore.isInitializing;
+			!cameraStore.isInitializing &&
+			!cameraInitializationLock;
 
 		const shouldInitializeMicrophone =
 			devices.includes("microphone") &&
 			microphoneStore.isEnabled &&
 			microphoneStore.selectedDeviceId &&
 			!microphoneStore.mainStream &&
-			!microphoneStore.isInitializing;
+			!microphoneStore.isInitializing &&
+			!microphoneInitializationLock;
 
 		if (shouldInitializeCamera) {
 			console.log("Auto-inicializando câmera...");
@@ -210,6 +245,74 @@ export function useDeviceInitialization(
 			return () => clearTimeout(timer);
 		}
 	}, [autoInitialize, reconnectDevices]);
+
+	// Watch for route changes or component re-mounts and reconnect if needed
+	useEffect(() => {
+		const interval = setInterval(() => {
+			// Check if devices are enabled but don't have streams
+			const cameraNeedsReconnect =
+				devices.includes("camera") &&
+				cameraStore.isEnabled &&
+				cameraStore.selectedDeviceId &&
+				!cameraStore.mainStream &&
+				!cameraStore.isInitializing;
+
+			const microphoneNeedsReconnect =
+				devices.includes("microphone") &&
+				microphoneStore.isEnabled &&
+				microphoneStore.selectedDeviceId &&
+				!microphoneStore.mainStream &&
+				!microphoneStore.isInitializing;
+
+			if (cameraNeedsReconnect || microphoneNeedsReconnect) {
+				console.log("🔄 Device reconnection needed:", {
+					camera: cameraNeedsReconnect,
+					microphone: microphoneNeedsReconnect,
+				});
+				reconnectDevices();
+			}
+		}, 3000); // Check every 3 seconds
+
+		return () => clearInterval(interval);
+	}, [
+		devices,
+		cameraStore.isEnabled,
+		cameraStore.selectedDeviceId,
+		cameraStore.mainStream,
+		cameraStore.isInitializing,
+		microphoneStore.isEnabled,
+		microphoneStore.selectedDeviceId,
+		microphoneStore.mainStream,
+		microphoneStore.isInitializing,
+		reconnectDevices,
+	]);
+
+	// Monitor stream health and reconnect if tracks become inactive
+	useEffect(() => {
+		const healthCheck = setInterval(async () => {
+			if (devices.includes("camera")) {
+				await cameraStore.checkAndReconnectCamera();
+			}
+
+			// Add microphone health check if needed
+			if (devices.includes("microphone")) {
+				const { isEnabled, selectedDeviceId, mainStream } = microphoneStore;
+				if (isEnabled && selectedDeviceId && mainStream) {
+					const streamActive =
+						mainStream.getTracks().length > 0 &&
+						mainStream.getTracks().some((track) => track.readyState === "live");
+					if (!streamActive) {
+						console.log(
+							"🔄 Microphone stream not active, attempting reconnect...",
+						);
+						await microphoneStore.reconnectMicrophone();
+					}
+				}
+			}
+		}, 5000); // Check every 5 seconds
+
+		return () => clearInterval(healthCheck);
+	}, [devices, cameraStore, microphoneStore]);
 
 	// Update initialized states based on streams
 	useEffect(() => {
