@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { AdvancedScreenRecorderManager } from "@/helpers/advanced-screen-recorder";
 import { useCameraConfigStore } from "@/store/store-camera-config";
@@ -17,6 +16,7 @@ import {
 	FileText,
 	Mic,
 	MicOff,
+	Video,
 } from "lucide-react";
 
 interface RecordingControlsProps {
@@ -45,6 +45,9 @@ export function RecordingControls({
 		useMicrophoneConfigStore();
 	const { headerConfig, footerConfig } = useHeaderConfigStore();
 	const { showSuccess, showError, showInfo } = useToastHelpers();
+
+	// Verificar se é modo câmera apenas
+	const isCameraOnlyMode = selectedSourceId?.id === "camera-only";
 
 	// Timer para mostrar o tempo de gravação
 	useEffect(() => {
@@ -105,11 +108,27 @@ export function RecordingControls({
 			return;
 		}
 
+		// Verificações específicas para modo câmera apenas
+		if (isCameraOnlyMode) {
+			if (!cameraEnabled) {
+				showError(
+					"Para usar modo 'Apenas Câmera', ative a câmera nas configurações",
+				);
+				return;
+			}
+			if (!cameraStream) {
+				showError(
+					"Stream da câmera não disponível. Verifique as configurações da câmera",
+				);
+				return;
+			}
+		}
+
 		try {
 			setIsLoading(true);
 
-			// Verificar se câmera está habilitada e tem stream
-			if (cameraEnabled && !cameraStream) {
+			// Verificar se câmera está habilitada e tem stream (apenas se não for modo câmera apenas)
+			if (!isCameraOnlyMode && cameraEnabled && !cameraStream) {
 				showError(
 					"Stream da câmera não disponível. Verifique as configurações da câmera",
 				);
@@ -127,23 +146,33 @@ export function RecordingControls({
 			// Iniciar contagem regressiva
 			await startCountdown();
 
-			// Minimizar janela após contagem
-			try {
-				await minimizeWindow();
-			} catch (error) {
-				console.warn("Erro ao minimizar janela:", error);
+			// Não minimizar janela no modo câmera apenas
+			if (!isCameraOnlyMode) {
+				try {
+					await minimizeWindow();
+				} catch (error) {
+					console.warn("Erro ao minimizar janela:", error);
+				}
+				// Aguardar um pouco para garantir que a janela foi minimizada
+				await new Promise((resolve) => setTimeout(resolve, 500));
 			}
-
-			// Aguardar um pouco para garantir que a janela foi minimizada
-			await new Promise((resolve) => setTimeout(resolve, 500));
 
 			const options = AdvancedScreenRecorderManager.getRecommendedOptions(
 				selectedSourceId.id,
 				selectedSaveLocation,
 			);
 
-			// Usar diretamente os estados dos stores
-			options.includeCameraOverlay = cameraEnabled;
+			// Configurar opções baseadas no modo
+			if (isCameraOnlyMode) {
+				// Para modo câmera apenas, não incluir overlay da câmera (pois a câmera É o vídeo principal)
+				options.includeCameraOverlay = false;
+				options.cameraOnly = true; // Nova opção para indicar modo câmera apenas
+			} else {
+				// Para modo normal, usar diretamente os estados dos stores
+				options.includeCameraOverlay = cameraEnabled;
+				options.cameraOnly = false;
+			}
+
 			options.includeMicrophone = microphoneEnabled;
 			options.includeHeader = headerConfig.isEnabled;
 			options.headerConfig = headerConfig;
@@ -153,8 +182,11 @@ export function RecordingControls({
 			await recorder.startRecording(options);
 			setIsRecording(true);
 
-			let message = "Gravação iniciada";
-			if (cameraEnabled) {
+			let message = isCameraOnlyMode
+				? "Gravação da câmera iniciada"
+				: "Gravação da tela iniciada";
+
+			if (!isCameraOnlyMode && cameraEnabled) {
 				message += " com câmera";
 			}
 			if (microphoneEnabled) {
@@ -210,7 +242,8 @@ export function RecordingControls({
 				<div className="flex flex-col gap-2">
 					<div className="flex items-center justify-between">
 						<p className="text-muted-foreground text-sm">
-							{isRecording && "Gravando..."}
+							{isRecording &&
+								(isCameraOnlyMode ? "Gravando câmera..." : "Gravando tela...")}
 						</p>
 
 						{isRecording && (
@@ -236,7 +269,8 @@ export function RecordingControls({
 									isLoading ||
 									!selectedSourceId ||
 									!selectedSaveLocation ||
-									countdown !== null
+									countdown !== null ||
+									(isCameraOnlyMode && !cameraEnabled)
 								}
 							>
 								{isLoading ? (
@@ -252,7 +286,7 @@ export function RecordingControls({
 								) : (
 									<>
 										<Play className="mr-2 h-4 w-4" />
-										Iniciar Gravação
+										{isCameraOnlyMode ? "Gravar Câmera" : "Iniciar Gravação"}
 									</>
 								)}
 							</Button>
@@ -263,73 +297,148 @@ export function RecordingControls({
 					{!isRecording && (
 						<div className="bg-muted/50 rounded-xl p-4 backdrop-blur-sm">
 							<div className="flex items-center space-x-2 mb-3">
-								<FileText className="h-4 w-4 text-blue-600" />
+								{isCameraOnlyMode ? (
+									<Video className="h-4 w-4 text-blue-600" />
+								) : (
+									<FileText className="h-4 w-4 text-blue-600" />
+								)}
 								<Label className="text-sm font-medium">
-									Configurações da Gravação
+									{isCameraOnlyMode
+										? "Modo Câmera Apenas"
+										: "Configurações da Gravação"}
 								</Label>
 							</div>
-							<div className="grid grid-cols-2 gap-2 text-xs">
-								<div className="flex items-center space-x-2">
-									{cameraEnabled && cameraStream ? (
-										<Camera className="h-3 w-3 text-green-600" />
-									) : (
-										<CameraOff className="h-3 w-3 text-gray-400" />
-									)}
-									<span
-										className={
-											cameraEnabled ? "text-green-600" : "text-gray-400"
-										}
-									>
-										{cameraEnabled ? "Câmera incluída" : "Câmera desabilitada"}
-									</span>
+
+							{isCameraOnlyMode ? (
+								<div className="space-y-2 text-xs">
+									<div className="flex items-center space-x-2">
+										<Camera className="h-3 w-3 text-blue-600" />
+										<span className="text-blue-600">
+											Gravando apenas a câmera em tela cheia
+										</span>
+									</div>
+									<div className="flex items-center space-x-2">
+										{microphoneEnabled && microphoneStream ? (
+											<Mic className="h-3 w-3 text-green-600" />
+										) : (
+											<MicOff className="h-3 w-3 text-gray-400" />
+										)}
+										<span
+											className={
+												microphoneEnabled ? "text-green-600" : "text-gray-400"
+											}
+										>
+											{microphoneEnabled
+												? "Microfone incluído"
+												: "Microfone desabilitado"}
+										</span>
+									</div>
+									<div className="flex items-center space-x-2">
+										<FileText
+											className={`h-3 w-3 ${headerConfig.isEnabled ? "text-blue-600" : "text-gray-400"}`}
+										/>
+										<span
+											className={
+												headerConfig.isEnabled
+													? "text-blue-600"
+													: "text-gray-400"
+											}
+										>
+											{headerConfig.isEnabled
+												? "Header incluído"
+												: "Header desabilitado"}
+										</span>
+									</div>
+									<div className="flex items-center space-x-2">
+										<Square
+											className={`h-3 w-3 ${footerConfig.isEnabled ? "text-blue-600" : "text-gray-400"}`}
+										/>
+										<span
+											className={
+												footerConfig.isEnabled
+													? "text-blue-600"
+													: "text-gray-400"
+											}
+										>
+											{footerConfig.isEnabled
+												? "Footer incluído"
+												: "Footer desabilitado"}
+										</span>
+									</div>
 								</div>
-								<div className="flex items-center space-x-2">
-									{microphoneEnabled && microphoneStream ? (
-										<Mic className="h-3 w-3 text-green-600" />
-									) : (
-										<MicOff className="h-3 w-3 text-gray-400" />
-									)}
-									<span
-										className={
-											microphoneEnabled ? "text-green-600" : "text-gray-400"
-										}
-									>
-										{microphoneEnabled
-											? "Microfone incluído"
-											: "Microfone desabilitado"}
-									</span>
+							) : (
+								<div className="grid grid-cols-2 gap-2 text-xs">
+									<div className="flex items-center space-x-2">
+										{cameraEnabled && cameraStream ? (
+											<Camera className="h-3 w-3 text-green-600" />
+										) : (
+											<CameraOff className="h-3 w-3 text-gray-400" />
+										)}
+										<span
+											className={
+												cameraEnabled ? "text-green-600" : "text-gray-400"
+											}
+										>
+											{cameraEnabled
+												? "Câmera incluída"
+												: "Câmera desabilitada"}
+										</span>
+									</div>
+									<div className="flex items-center space-x-2">
+										{microphoneEnabled && microphoneStream ? (
+											<Mic className="h-3 w-3 text-green-600" />
+										) : (
+											<MicOff className="h-3 w-3 text-gray-400" />
+										)}
+										<span
+											className={
+												microphoneEnabled ? "text-green-600" : "text-gray-400"
+											}
+										>
+											{microphoneEnabled
+												? "Microfone incluído"
+												: "Microfone desabilitado"}
+										</span>
+									</div>
+									<div className="flex items-center space-x-2">
+										<FileText
+											className={`h-3 w-3 ${headerConfig.isEnabled ? "text-blue-600" : "text-gray-400"}`}
+										/>
+										<span
+											className={
+												headerConfig.isEnabled
+													? "text-blue-600"
+													: "text-gray-400"
+											}
+										>
+											{headerConfig.isEnabled
+												? "Header incluído"
+												: "Header desabilitado"}
+										</span>
+									</div>
+									<div className="flex items-center space-x-2">
+										<Square
+											className={`h-3 w-3 ${footerConfig.isEnabled ? "text-blue-600" : "text-gray-400"}`}
+										/>
+										<span
+											className={
+												footerConfig.isEnabled
+													? "text-blue-600"
+													: "text-gray-400"
+											}
+										>
+											{footerConfig.isEnabled
+												? "Footer incluído"
+												: "Footer desabilitado"}
+										</span>
+									</div>
 								</div>
-								<div className="flex items-center space-x-2">
-									<FileText
-										className={`h-3 w-3 ${headerConfig.isEnabled ? "text-blue-600" : "text-gray-400"}`}
-									/>
-									<span
-										className={
-											headerConfig.isEnabled ? "text-blue-600" : "text-gray-400"
-										}
-									>
-										{headerConfig.isEnabled
-											? "Header incluído"
-											: "Header desabilitado"}
-									</span>
-								</div>
-								<div className="flex items-center space-x-2">
-									<Square
-										className={`h-3 w-3 ${footerConfig.isEnabled ? "text-blue-600" : "text-gray-400"}`}
-									/>
-									<span
-										className={
-											footerConfig.isEnabled ? "text-blue-600" : "text-gray-400"
-										}
-									>
-										{footerConfig.isEnabled
-											? "Footer incluído"
-											: "Footer desabilitado"}
-									</span>
-								</div>
-							</div>
+							)}
+
 							<div className="mt-3 text-xs text-muted-foreground">
-								Use as configurações à direita para ativar/desativar os recursos
+								{isCameraOnlyMode
+									? "Sua câmera será gravada em tela cheia"
+									: "Use as configurações à direita para ativar/desativar os recursos"}
 							</div>
 						</div>
 					)}

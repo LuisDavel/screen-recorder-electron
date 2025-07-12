@@ -33,6 +33,7 @@ export interface UseDeviceInitializationReturn {
 
 	// Control
 	reset: () => void;
+	reconnectDevices: () => Promise<void>;
 }
 
 export function useDeviceInitialization(
@@ -134,6 +135,19 @@ export function useDeviceInitialization(
 		await Promise.all(promises);
 	}, [devices, initializeCamera, initializeMicrophone]);
 
+	// Reconnect devices on page load
+	const reconnectDevices = useCallback(async (): Promise<void> => {
+		console.log("Attempting to reconnect devices...");
+
+		if (devices.includes("camera")) {
+			await cameraStore.reconnectCamera();
+		}
+
+		if (devices.includes("microphone")) {
+			await microphoneStore.reconnectMicrophone();
+		}
+	}, [devices, cameraStore, microphoneStore]);
+
 	// Reset function
 	const reset = useCallback(() => {
 		setCameraInitialized(false);
@@ -185,6 +199,18 @@ export function useDeviceInitialization(
 		initializeMicrophone,
 	]);
 
+	// Reconnect devices on mount (for page refresh scenarios)
+	useEffect(() => {
+		if (autoInitialize) {
+			// Small delay to ensure stores are hydrated
+			const timer = setTimeout(() => {
+				reconnectDevices();
+			}, 500);
+
+			return () => clearTimeout(timer);
+		}
+	}, [autoInitialize, reconnectDevices]);
+
 	// Update initialized states based on streams
 	useEffect(() => {
 		if (devices.includes("camera")) {
@@ -233,5 +259,6 @@ export function useDeviceInitialization(
 
 		// Control
 		reset,
+		reconnectDevices,
 	};
 }

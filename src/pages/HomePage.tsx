@@ -33,10 +33,12 @@ export default function HomePage() {
 		});
 
 	// Use the new centralized device initialization and notifications
-	useDeviceInitialization({
-		devices: ["camera", "microphone"],
-		autoInitialize: true,
-	});
+	const { reconnectDevices, isAnyDeviceInitializing } = useDeviceInitialization(
+		{
+			devices: ["camera", "microphone"],
+			autoInitialize: true,
+		},
+	);
 
 	useDeviceNotifications({
 		devices: ["camera", "microphone"],
@@ -48,6 +50,11 @@ export default function HomePage() {
 			setTimeout(() => initializePermissions(), 1000);
 		}
 	}, [allPermissionsGranted, initializePermissions]);
+
+	// Manual reconnection handler
+	const handleReconnectDevices = useCallback(async () => {
+		await reconnectDevices();
+	}, [reconnectDevices]);
 
 	return (
 		<div className="flex h-full flex-col gap-6 p-6">
@@ -144,6 +151,21 @@ export default function HomePage() {
 										)}
 									</div>
 								</div>
+
+								{/* Reconnect button for devices */}
+								{((cameraEnabled && !mainStream) ||
+									(microphoneEnabled && !microphoneStream)) && (
+									<Button
+										onClick={handleReconnectDevices}
+										disabled={isAnyDeviceInitializing}
+										variant="outline"
+										className="w-full text-sm"
+									>
+										{isAnyDeviceInitializing
+											? "Reconectando..."
+											: "Reconectar Dispositivos"}
+									</Button>
+								)}
 
 								<Link to="/config">
 									<Button variant="outline" className="h-12 w-full text-base">

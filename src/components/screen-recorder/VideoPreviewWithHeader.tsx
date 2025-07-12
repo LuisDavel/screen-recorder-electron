@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from "react";
 import { useHeaderConfigStore } from "@/store/store-header-config";
 import { PreviewHeader } from "../recording-header/PreviewHeader";
 import { PreviewFooter } from "../recording-header/PreviewFooter";
+import { useSourceVideoStore } from "@/store/store-source-video";
 
 interface VideoPreviewWithHeaderProps {
 	stream: MediaStream | null;
@@ -16,6 +17,10 @@ export default function VideoPreviewWithHeader({
 }: VideoPreviewWithHeaderProps) {
 	const videoRef = useRef<HTMLVideoElement>(null);
 	const { headerConfig, footerConfig } = useHeaderConfigStore();
+	const { sourceId } = useSourceVideoStore();
+
+	// Verificar se é modo câmera apenas
+	const isCameraOnlyMode = sourceId?.id === "camera-only";
 
 	useEffect(() => {
 		if (videoRef.current && stream) {
@@ -45,7 +50,9 @@ export default function VideoPreviewWithHeader({
 			{isRecording && (
 				<div className="absolute top-2 right-2 z-[90] flex items-center space-x-2 bg-red-600 text-white px-3 py-1 rounded-full">
 					<div className="h-2 w-2 bg-white rounded-full animate-pulse"></div>
-					<span className="text-sm font-medium">REC</span>
+					<span className="text-sm font-medium">
+						{isCameraOnlyMode ? "CAM" : "REC"}
+					</span>
 				</div>
 			)}
 
@@ -53,9 +60,15 @@ export default function VideoPreviewWithHeader({
 			{!stream && (
 				<div className="absolute inset-0 flex items-center justify-center text-gray-500">
 					<div className="text-center">
-						<p className="text-lg">Nenhuma fonte selecionada</p>
+						<p className="text-lg">
+							{isCameraOnlyMode
+								? "Câmera não disponível"
+								: "Nenhuma fonte selecionada"}
+						</p>
 						<p className="mt-2 text-sm">
-							Selecione uma fonte para visualizar o preview
+							{isCameraOnlyMode
+								? "Ative a câmera nas configurações para usar este modo"
+								: "Selecione uma fonte para visualizar o preview"}
 						</p>
 					</div>
 				</div>

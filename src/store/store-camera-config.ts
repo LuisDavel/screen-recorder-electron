@@ -50,6 +50,12 @@ export interface CameraConfigActions {
 	setIsPreviewActive: (active: boolean) => void;
 	initializePreviewStream: () => Promise<void>;
 	stopPreviewStream: () => void;
+	// Initialize main stream method
+	initializeMainStream: () => Promise<void>;
+	// Stop main stream method
+	stopMainStream: () => void;
+	// Reconnect method for when returning to the page
+	reconnectCamera: () => Promise<void>;
 	// Notification callbacks
 	onSuccess?: (message: string) => void;
 	onError?: (message: string) => void;
@@ -127,6 +133,62 @@ export const useCameraConfigStore = create<CameraConfigStore>()(
 					set({ previewStream: null });
 				}
 			},
+			// Initialize main stream method
+			initializeMainStream: async () => {
+				const { selectedDeviceId, isEnabled, mainStream, isInitializing } =
+					get();
+
+				// Don't initialize if not enabled, no device selected, or already initializing
+				if (!isEnabled || !selectedDeviceId || isInitializing) {
+					return;
+				}
+
+				// Stop existing stream if any
+				if (mainStream) {
+					mainStream.getTracks().forEach((track) => track.stop());
+				}
+
+				set({ isInitializing: true, mainStream: null, error: null });
+
+				try {
+					const stream = await navigator.mediaDevices.getUserMedia({
+						video: { deviceId: selectedDeviceId },
+					});
+					set({ mainStream: stream, isInitializing: false });
+
+					const { onSuccess } = get();
+					onSuccess?.("Câmera inicializada com sucesso");
+				} catch (error) {
+					console.error("Erro ao inicializar câmera:", error);
+					set({
+						isInitializing: false,
+						error: `Erro ao inicializar câmera: ${error instanceof Error ? error.message : String(error)}`,
+					});
+
+					const { onError } = get();
+					onError?.(
+						`Erro ao inicializar câmera: ${error instanceof Error ? error.message : String(error)}`,
+					);
+				}
+			},
+			// Stop main stream method
+			stopMainStream: () => {
+				const { mainStream } = get();
+				if (mainStream) {
+					mainStream.getTracks().forEach((track) => track.stop());
+					set({ mainStream: null });
+				}
+			},
+			// Reconnect method for when returning to the page
+			reconnectCamera: async () => {
+				const { isEnabled, selectedDeviceId, mainStream } = get();
+
+				// Only reconnect if enabled, has device selected, and no current stream
+				if (isEnabled && selectedDeviceId && !mainStream) {
+					console.log("Reconnecting camera...");
+					await get().initializeMainStream();
+				}
+			},
 			// Notification callbacks
 			setNotificationCallbacks: (callbacks) =>
 				set({
@@ -143,6 +205,9 @@ export const useCameraConfigStore = create<CameraConfigStore>()(
 				isEnabled: state.isEnabled,
 				position: state.position,
 				size: state.size,
+				selectedDeviceId: state.selectedDeviceId,
+				devices: state.devices,
+				hasPermission: state.hasPermission,
 				// Don't persist streams or loading states
 			}),
 		},

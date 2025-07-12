@@ -13,6 +13,7 @@ import { VideoHeaderComposer } from "./video-header-composer";
 import { VideoFooterComposer } from "./video-footer-composer";
 
 import type { HeaderConfig, FooterConfig } from "@/store/store-header-config";
+import { useHeaderConfigStore } from "@/store/store-header-config";
 
 export interface AdvancedRecordingOptions {
 	sourceId: string;
@@ -27,6 +28,7 @@ export interface AdvancedRecordingOptions {
 	outputHeight?: number;
 	frameRate?: number;
 	videoBitrate?: number;
+	cameraOnly?: boolean; // Indica se deve gravar apenas a câmera em fullscreen
 }
 
 export class AdvancedScreenRecorderManager {
@@ -50,8 +52,9 @@ export class AdvancedScreenRecorderManager {
 	// Setup background mode listener using events instead of hooks
 	private setupBackgroundModeListener(): void {
 		if (typeof window !== "undefined") {
-			window.addEventListener("recording-background-mode", (event: any) => {
-				this.handleBackgroundMode(event.detail?.enabled || false);
+			window.addEventListener("recording-background-mode", (event: Event) => {
+				const customEvent = event as CustomEvent;
+				this.handleBackgroundMode(customEvent.detail?.enabled || false);
 			});
 		}
 	}
@@ -75,7 +78,19 @@ export class AdvancedScreenRecorderManager {
 
 	// Obter stream da tela
 	private async getScreenStream(sourceId: string): Promise<MediaStream> {
-		console.log("Obtendo stream da tela para fonte:", sourceId);
+		console.log("Obtendo stream da tela para sourceId:", sourceId);
+
+		// Se for modo câmera apenas, retornar stream da câmera diretamente
+		if (sourceId === "camera-only") {
+			console.log("Modo câmera apenas detectado");
+			const cameraStream = this.getCameraStream();
+			if (!cameraStream) {
+				throw new Error(
+					"Stream da câmera não disponível para modo câmera apenas",
+				);
+			}
+			return cameraStream;
+		}
 
 		try {
 			const stream = await navigator.mediaDevices.getUserMedia({
@@ -84,64 +99,20 @@ export class AdvancedScreenRecorderManager {
 					mandatory: {
 						chromeMediaSource: "desktop",
 						chromeMediaSourceId: sourceId,
-						// Reduzir resolução máxima para melhor performance
-						maxWidth: 1920,
-						maxHeight: 1080,
-						// Configurar frame rate mais conservador para Windows
-						minFrameRate: 15,
-						maxFrameRate: 30,
 					},
-				} as any,
+				} as MediaTrackConstraints,
 			});
 
-			// Obter dimensões reais da tela capturada
-			const videoTrack = stream.getVideoTracks()[0];
-			const settings = videoTrack.getSettings();
-
-			// Detectar se é captura de tela completa (sem foco de aplicação)
-			const isFullScreenCapture =
-				sourceId.includes("screen:") ||
-				(settings.width && settings.height && settings.width > 1600);
-
-			console.log("Stream da tela obtido com sucesso", {
-				sourceId,
+			console.log("Stream da tela obtido com sucesso:", {
+				id: stream.id,
 				tracks: stream.getTracks().length,
 				videoTracks: stream.getVideoTracks().length,
-				resolution: `${settings.width}x${settings.height}`,
-				aspectRatio:
-					settings.width && settings.height
-						? (settings.width / settings.height).toFixed(2)
-						: "unknown",
-				frameRate: settings.frameRate,
-				isFullScreenCapture,
-				isUltrawide:
-					settings.width && settings.height
-						? settings.width / settings.height > 2.0
-						: false,
 			});
-
-			// Se for captura de tela completa e detectarmos aspect ratio incorreto, alertar
-			if (isFullScreenCapture && settings.width && settings.height) {
-				const aspectRatio = settings.width / settings.height;
-				if (aspectRatio < 2.0 && settings.width > 1600) {
-					console.warn(
-						"⚠️ DETECÇÃO: Possível problema com captura de tela ultrawide",
-						{
-							dimensõesCapturadas: `${settings.width}x${settings.height}`,
-							aspectRatioDetectado: aspectRatio.toFixed(3),
-							expectedUltrawide: "~2.35",
-							recomendação: "Forçar correção de aspect ratio",
-						},
-					);
-				}
-			}
 
 			return stream;
 		} catch (error) {
 			console.error("Erro ao obter stream da tela:", error);
-			throw new Error(
-				`Falha ao capturar tela: ${error instanceof Error ? error.message : String(error)}`,
-			);
+			throw error;
 		}
 	}
 
@@ -228,6 +199,30 @@ export class AdvancedScreenRecorderManager {
 		options: AdvancedRecordingOptions,
 	): Promise<MediaStream> {
 		let currentStream = screenStream;
+
+		// Se for modo câmera apenas, usar apenas a câmera sem compositor
+		if (options.cameraOnly) {
+			console.log("Modo câmera apenas: usando stream da câmera diretamente");
+
+			// Adicionar áudio se disponível
+			if (audioStream) {
+				console.log("Adicionando áudio ao stream da câmera");
+				try {
+					// Criar nova stream combinando vídeo da câmera com áudio
+					const combinedStream = new MediaStream([
+						...currentStream.getVideoTracks(),
+						...audioStream.getAudioTracks(),
+					]);
+					return combinedStream;
+				} catch (error) {
+					console.warn("Erro ao adicionar áudio ao stream da câmera:", error);
+					return currentStream;
+				}
+			}
+
+			// Retornar stream da câmera puro
+			return currentStream;
+		}
 
 		// First, apply camera overlay if needed
 		if (cameraStream && options.includeCameraOverlay) {
@@ -995,7 +990,7 @@ export class AdvancedScreenRecorderManager {
 	// Obter configurações atuais
 	public getSettings(): {
 		options: AdvancedRecordingOptions | null;
-		composerSettings: any;
+		composerSettings: unknown;
 	} {
 		return {
 			options: this.options,
@@ -1044,6 +1039,11 @@ export class AdvancedScreenRecorderManager {
 			typeof navigator !== "undefined" &&
 			navigator.platform.toLowerCase().includes("win");
 
+		// Obter estados atuais dos dispositivos
+		const cameraStore = useCameraConfigStore.getState();
+		const microphoneStore = useMicrophoneConfigStore.getState();
+		const { headerConfig, footerConfig } = useHeaderConfigStore.getState();
+
 		// Configurações específicas para MP4
 		const mp4Config = {
 			frameRate: isWindows ? 15 : 20, // Ainda mais baixo para MP4 no Windows
@@ -1064,17 +1064,23 @@ export class AdvancedScreenRecorderManager {
 			frameRate: config.frameRate,
 			bitrate: config.videoBitrate,
 			otimizado: isMP4 ? "MP4" : "Padrão",
+			cameraAtiva: cameraStore.isEnabled,
+			microphoneAtivo: microphoneStore.isEnabled,
+			headerAtivo: headerConfig.isEnabled,
+			footerAtivo: footerConfig.isEnabled,
 		});
 
 		return {
 			sourceId,
 			saveLocation,
-			includeCameraOverlay: true,
-			includeMicrophone: true,
-			includeHeader: false,
-			headerConfig: undefined,
-			includeFooter: false,
-			footerConfig: undefined,
+			// Usar o estado atual dos dispositivos ao invés de sempre true
+			includeCameraOverlay: cameraStore.isEnabled && !!cameraStore.mainStream,
+			includeMicrophone:
+				microphoneStore.isEnabled && !!microphoneStore.mainStream,
+			includeHeader: headerConfig.isEnabled,
+			headerConfig: headerConfig,
+			includeFooter: footerConfig.isEnabled,
+			footerConfig: footerConfig,
 			// Configurações otimizadas baseadas no formato
 			outputWidth: undefined, // Será detectado automaticamente
 			outputHeight: undefined, // Será detectado automaticamente
