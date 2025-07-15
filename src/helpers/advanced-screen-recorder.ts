@@ -768,7 +768,37 @@ export class AdvancedScreenRecorderManager {
 
 		this.mediaRecorder.ondataavailable = (event) => {
 			if (event.data.size > 0) {
-				this.recordedChunks.push(event.data);
+				// CORREÇÃO: Verificar se o chunk é muito grande (indicativo de problema de pause/resume)
+				const isLargeChunk = event.data.size > 5000000; // 5MB
+				const isHugeChunk = event.data.size > 20000000; // 20MB
+
+				if (isHugeChunk) {
+					console.error(
+						"🚨 CHUNK MUITO GRANDE DETECTADO - Possível causa de travamento!",
+						{
+							chunkSize: event.data.size,
+							chunkSizeMB:
+								Math.round((event.data.size / 1024 / 1024) * 100) / 100,
+							totalChunks: this.recordedChunks.length,
+							recomendacao: "Este chunk pode causar travamento no vídeo final",
+						},
+					);
+
+					// Implementar quebra de chunks grandes
+					this.splitLargeChunk(event.data);
+				} else if (isLargeChunk) {
+					console.warn("⚠️ CHUNK GRANDE DETECTADO", {
+						chunkSize: event.data.size,
+						chunkSizeMB:
+							Math.round((event.data.size / 1024 / 1024) * 100) / 100,
+						totalChunks: this.recordedChunks.length,
+						observacao: "Monitorando para possível travamento",
+					});
+
+					this.recordedChunks.push(event.data);
+				} else {
+					this.recordedChunks.push(event.data);
+				}
 
 				// Monitorar performance para detectar problemas
 				const totalSize = this.recordedChunks.reduce(
@@ -777,11 +807,14 @@ export class AdvancedScreenRecorderManager {
 				);
 				const avgChunkSize = totalSize / this.recordedChunks.length;
 
-				console.log("Chunk gravado", {
+				console.log("📦 Chunk gravado", {
 					size: event.data.size,
+					sizeMB: Math.round((event.data.size / 1024 / 1024) * 100) / 100,
 					totalChunks: this.recordedChunks.length,
 					totalSize: totalSize,
+					totalSizeMB: Math.round((totalSize / 1024 / 1024) * 100) / 100,
 					avgChunkSize: Math.round(avgChunkSize),
+					isPotentiallyProblematic: isLargeChunk,
 				});
 
 				// Alertar se chunks estão muito pequenos (possível problema de performance)
@@ -838,15 +871,33 @@ export class AdvancedScreenRecorderManager {
 		};
 
 		this.mediaRecorder.onstart = () => {
-			console.log("MediaRecorder iniciado");
+			console.log("🎬 MediaRecorder iniciado");
 		};
 
 		this.mediaRecorder.onpause = () => {
-			console.log("MediaRecorder pausado");
+			console.log("⏸️ MediaRecorder pausado");
+
+			// CORREÇÃO: Solicitar dados pendentes após pausar para evitar acúmulo
+			setTimeout(() => {
+				if (this.mediaRecorder && this.mediaRecorder.state === "paused") {
+					try {
+						this.mediaRecorder.requestData();
+						console.log("📦 Dados pendentes solicitados após pausa");
+					} catch (error) {
+						console.warn(
+							"Aviso: Não foi possível solicitar dados após pausa:",
+							error,
+						);
+					}
+				}
+			}, 50);
 		};
 
 		this.mediaRecorder.onresume = () => {
-			console.log("MediaRecorder retomado");
+			console.log("▶️ MediaRecorder retomado");
+
+			// CORREÇÃO: Monitorar chunks após retomar para detectar chunks grandes
+			this.monitorChunksAfterResume();
 		};
 
 		this.mediaRecorder.onerror = (event) => {
@@ -855,7 +906,7 @@ export class AdvancedScreenRecorderManager {
 				typeof navigator !== "undefined" &&
 				navigator.platform.toLowerCase().includes("win");
 
-			console.error("Erro no MediaRecorder:", event);
+			console.error("❌ Erro no MediaRecorder:", event);
 
 			// Tratamento específico para MP4 no Windows
 			if (videoFormatState.format === "mp4" && isWindows) {
@@ -876,9 +927,66 @@ export class AdvancedScreenRecorderManager {
 		};
 
 		this.mediaRecorder.onstop = async () => {
-			console.log("MediaRecorder parado, processando vídeo...");
+			console.log("🛑 MediaRecorder parado, processando vídeo...");
 			await this.processRecording();
 		};
+	}
+
+	// CORREÇÃO: Método para dividir chunks muito grandes
+	private splitLargeChunk(largeChunk: Blob): void {
+		const chunkSize = 2000000; // 2MB por chunk
+		const totalSize = largeChunk.size;
+		const numChunks = Math.ceil(totalSize / chunkSize);
+
+		console.log("✂️ Dividindo chunk grande:", {
+			tamanhoOriginal: totalSize,
+			tamanhoOriginalMB: Math.round((totalSize / 1024 / 1024) * 100) / 100,
+			numChunks: numChunks,
+			tamanhoChunkMB: Math.round((chunkSize / 1024 / 1024) * 100) / 100,
+		});
+
+		for (let i = 0; i < numChunks; i++) {
+			const start = i * chunkSize;
+			const end = Math.min(start + chunkSize, totalSize);
+			const chunk = largeChunk.slice(start, end);
+			this.recordedChunks.push(chunk);
+		}
+	}
+
+	// CORREÇÃO: Monitorar chunks após retomar para detectar problemas
+	private monitorChunksAfterResume(): void {
+		const monitorStartTime = Date.now();
+		const chunksBeforeResume = this.recordedChunks.length;
+
+		// Monitorar por 10 segundos após retomar
+		const monitorInterval = setInterval(() => {
+			const currentChunks = this.recordedChunks.length;
+			const newChunks = currentChunks - chunksBeforeResume;
+
+			if (newChunks > 0) {
+				// Verificar se há chunks grandes nos últimos chunks
+				const recentChunks = this.recordedChunks.slice(-newChunks);
+				const largeChunks = recentChunks.filter(
+					(chunk) => chunk.size > 5000000,
+				);
+
+				if (largeChunks.length > 0) {
+					console.warn("⚠️ Chunks grandes detectados após retomar:", {
+						chunksGrandes: largeChunks.length,
+						tamanhoMedio: Math.round(
+							largeChunks.reduce((sum, c) => sum + c.size, 0) /
+								largeChunks.length,
+						),
+						observacao: "Possível causa de travamento no vídeo final",
+					});
+				}
+			}
+
+			// Parar monitoramento após 10 segundos
+			if (Date.now() - monitorStartTime > 10000) {
+				clearInterval(monitorInterval);
+			}
+		}, 1000);
 	}
 
 	// Processar gravação quando parar
@@ -1119,8 +1227,41 @@ export class AdvancedScreenRecorderManager {
 		}
 
 		if (this.mediaRecorder.state === "recording") {
-			this.mediaRecorder.pause();
-			console.log("Gravação pausada");
+			console.log("🎬 Iniciando pausa da gravação...");
+
+			// CORREÇÃO: Forçar flush dos chunks antes de pausar para evitar travamento
+			try {
+				// Solicitar dados pendentes antes de pausar
+				this.mediaRecorder.requestData();
+				console.log("📦 Dados pendentes solicitados antes da pausa");
+
+				// Aguardar um pouco para garantir que os dados sejam processados
+				setTimeout(() => {
+					if (this.mediaRecorder && this.mediaRecorder.state === "recording") {
+						this.mediaRecorder.pause();
+						console.log("⏸️ Gravação pausada com sucesso");
+
+						// Log do estado atual dos chunks
+						const totalSize = this.recordedChunks.reduce(
+							(sum, chunk) => sum + chunk.size,
+							0,
+						);
+						console.log("📊 Estado dos chunks na pausa:", {
+							totalChunks: this.recordedChunks.length,
+							totalSize: totalSize,
+							avgChunkSize:
+								this.recordedChunks.length > 0
+									? Math.round(totalSize / this.recordedChunks.length)
+									: 0,
+						});
+					}
+				}, 100);
+			} catch (error) {
+				console.error("Erro ao forçar flush antes da pausa:", error);
+				// Fallback: pausar diretamente
+				this.mediaRecorder.pause();
+				console.log("⏸️ Gravação pausada (fallback)");
+			}
 		}
 	}
 
@@ -1132,8 +1273,20 @@ export class AdvancedScreenRecorderManager {
 		}
 
 		if (this.mediaRecorder.state === "paused") {
+			console.log("🎬 Iniciando retomada da gravação...");
+
+			// Log do estado antes de retomar
+			const totalSizeBefore = this.recordedChunks.reduce(
+				(sum, chunk) => sum + chunk.size,
+				0,
+			);
+			console.log("📊 Estado dos chunks antes da retomada:", {
+				totalChunks: this.recordedChunks.length,
+				totalSize: totalSizeBefore,
+			});
+
 			this.mediaRecorder.resume();
-			console.log("Gravação retomada");
+			console.log("▶️ Gravação retomada com sucesso");
 		}
 	}
 
