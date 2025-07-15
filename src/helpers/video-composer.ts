@@ -409,16 +409,6 @@ export class VideoComposer {
 					offsetX = (targetWidth - renderWidth) / 2;
 				}
 
-				console.log("🎥 Renderizando câmera com aspect ratio preservado:", {
-					cameraOriginal: `${cameraVideoWidth}x${cameraVideoHeight}`,
-					cameraAspectRatio: cameraAspectRatio.toFixed(3),
-					targetSpace: `${targetWidth}x${targetHeight}`,
-					targetAspectRatio: targetAspectRatio.toFixed(3),
-					renderFinal: `${Math.round(renderWidth)}x${Math.round(renderHeight)}`,
-					offset: `${Math.round(offsetX)}, ${Math.round(offsetY)}`,
-					preservandoAspectRatio: "SIM",
-				});
-
 				// Preencher fundo da área da câmera com preto
 				this.ctx.fillStyle = "#000000";
 				this.ctx.fillRect(

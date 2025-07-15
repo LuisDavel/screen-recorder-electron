@@ -1,7 +1,7 @@
 import React from "react";
 import { SaveLocationSelector } from "@/components/screen-recorder/SaveLocationSelector";
 import { VideoFormatSelector } from "@/components/VideoFormatSelector";
-import { VideoFormatDebugger } from "@/components/VideoFormatDebugger";
+import { S3ConfigDialog } from "@/components/S3ConfigDialog";
 import { useSaveLocationStore } from "@/store/store-local-path-video";
 import { ArrowLeft } from "lucide-react";
 import { Link } from "@tanstack/react-router";
@@ -25,6 +25,7 @@ export default function SecondPage() {
 				Personalize suas preferências de gravação, qualidade e outros ajustes do
 				aplicativo.
 			</p>
+
 			<div className="flex flex-col gap-6">
 				<div className="grid w-full grid-cols-1 gap-6 md:grid-cols-2">
 					<SaveLocationSelector
@@ -32,6 +33,10 @@ export default function SecondPage() {
 						selectedLocation={saveLocation}
 					/>
 					<VideoFormatSelector />
+				</div>
+
+				<div className="flex justify-center">
+					<S3ConfigDialog />
 				</div>
 			</div>
 		</div>

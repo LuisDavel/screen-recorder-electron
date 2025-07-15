@@ -5,6 +5,7 @@ import { exposeScreenRecorderContext } from "./screen-recorder/screen-recorder-c
 import { exposePermissionsContext } from "./permissions/permissions-context";
 import { exposeProductionLogsContext } from "./production-logs/production-logs-context";
 import { exposeDiagnosticContext } from "./diagnostic/diagnostic-context";
+import { exposeS3UploadContext } from "./s3-upload/s3-upload-context";
 
 // Controle para evitar exposição duplicada
 let contextsExposed = false;
@@ -24,6 +25,7 @@ export default function exposeContexts() {
 		exposePermissionsContext();
 		exposeProductionLogsContext();
 		exposeDiagnosticContext();
+		exposeS3UploadContext();
 
 		contextsExposed = true;
 		console.log("Contextos IPC expostos com sucesso");

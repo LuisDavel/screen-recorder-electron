@@ -136,6 +136,7 @@ declare interface Window {
 	permissions: PermissionsContext;
 	productionLogs: ProductionLogsContext;
 	diagnostic: DiagnosticContext;
+	s3Upload: S3UploadContext;
 }
 
 // Adicionar o tipo PlatformType
@@ -162,3 +163,47 @@ type DefaultSaveLocations = {
 	videos: string;
 	downloads: string;
 };
+
+// Adicionar interfaces para S3 Upload
+interface S3Config {
+	accessKeyId: string;
+	secretAccessKey: string;
+	region: string;
+	bucketName: string;
+	folderPrefix?: string;
+}
+
+interface S3UploadResult {
+	success: boolean;
+	message: string;
+	s3Url?: string;
+	uploadId?: string;
+	error?: string;
+}
+
+interface S3UploadProgress {
+	loaded: number;
+	total: number;
+	percentage: number;
+}
+
+interface S3UploadContext {
+	uploadFile: (filePath: string, s3Config: S3Config) => Promise<S3UploadResult>;
+	testConnection: (s3Config: S3Config) => Promise<S3UploadResult>;
+	onProgress: (
+		callback: (
+			event: Electron.IpcRendererEvent,
+			progress: S3UploadProgress,
+		) => void,
+	) => void;
+	onComplete: (
+		callback: (
+			event: Electron.IpcRendererEvent,
+			result: S3UploadResult,
+		) => void,
+	) => void;
+	onError: (
+		callback: (event: Electron.IpcRendererEvent, error: string) => void,
+	) => void;
+	removeAllListeners: () => void;
+}

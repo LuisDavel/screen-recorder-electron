@@ -86,6 +86,8 @@
 		"vitest": "^3.1.2"
 	},
 	"dependencies": {
+		"@aws-sdk/client-s3": "^3.844.0",
+		"@aws-sdk/lib-storage": "^3.844.0",
 		"@biomejs/biome": "^2.0.6",
 		"@icons-pack/react-simple-icons": "^12.7.0",
 		"@radix-ui/react-dialog": "^1.1.14",

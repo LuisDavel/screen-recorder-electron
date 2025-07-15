@@ -42,7 +42,15 @@ function createWindow() {
 	});
 
 	console.log("Registrando IPC listeners...");
-	registerListeners(mainWindow);
+	console.log("🔍 registerListeners type:", typeof registerListeners);
+
+	try {
+		registerListeners(mainWindow);
+		console.log("✅ registerListeners chamado com sucesso");
+	} catch (error) {
+		console.error("❌ Erro ao chamar registerListeners:", error);
+		throw error;
+	}
 
 	// Handle media permissions properly - request system permissions
 	mainWindow.webContents.session.setPermissionRequestHandler(
@@ -193,7 +201,7 @@ const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
 	app.quit();
 } else {
-	app.on("second-instance", (event, commandLine, workingDirectory) => {
+	app.on("second-instance", (event, commandLine) => {
 		if (mainWindow) {
 			if (mainWindow.isMinimized()) mainWindow.restore();
 			mainWindow.focus();
