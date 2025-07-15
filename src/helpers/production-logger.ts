@@ -5,9 +5,15 @@ import { app } from "electron";
 export class ProductionLogger {
 	private static logFile: string;
 	private static logDir: string;
+	private static initialized = false;
 
 	static initialize() {
 		try {
+			// Evitar inicialização duplicada
+			if (this.initialized) {
+				return;
+			}
+
 			// Criar diretório de logs sempre, não apenas em desenvolvimento
 			this.logDir = join(app.getPath("userData"), "logs");
 			if (!existsSync(this.logDir)) {
@@ -18,10 +24,20 @@ export class ProductionLogger {
 			const timestamp = new Date().toISOString().split("T")[0];
 			this.logFile = join(this.logDir, `permissions-${timestamp}.log`);
 
+			this.initialized = true;
+
 			this.log("INFO", "Production logger initialized");
 			this.log("INFO", `Log file: ${this.logFile}`);
 		} catch (error) {
 			console.error("Failed to initialize production logger:", error);
+			this.initialized = false;
+		}
+	}
+
+	// Método auxiliar para garantir inicialização
+	private static ensureInitialized(): void {
+		if (!this.initialized) {
+			this.initialize();
 		}
 	}
 
@@ -31,6 +47,9 @@ export class ProductionLogger {
 		data?: Record<string, unknown> | string | boolean,
 	) {
 		try {
+			// Garantir inicialização antes de usar
+			this.ensureInitialized();
+
 			// Sempre mostrar no console em desenvolvimento
 			if (process.env.NODE_ENV === "development") {
 				console.log(`[PROD-LOG] ${level}: ${message}`, data || "");
@@ -49,6 +68,7 @@ export class ProductionLogger {
 				"success",
 				"completed",
 				"started",
+				"Application", // Adicionar para logAppStart e logAppQuit
 			];
 
 			// Verificar se a mensagem é importante
@@ -71,10 +91,12 @@ export class ProductionLogger {
 	}
 
 	static getLogDirectory(): string {
+		this.ensureInitialized();
 		return this.logDir || join(app.getPath("userData"), "logs");
 	}
 
 	static getLogFilePath(): string {
+		this.ensureInitialized();
 		const timestamp = new Date().toISOString().split("T")[0];
 		return (
 			this.logFile ||
@@ -86,6 +108,7 @@ export class ProductionLogger {
 		type: "camera" | "microphone" | "screen",
 		granted: boolean,
 	) {
+		this.ensureInitialized();
 		this.log(
 			granted ? "INFO" : "WARN",
 			`Permission request for ${type}: ${granted ? "GRANTED" : "DENIED"}`,
@@ -97,6 +120,7 @@ export class ProductionLogger {
 		microphone: boolean;
 		screenCapture: boolean;
 	}) {
+		this.ensureInitialized();
 		this.log("INFO", "Permission status check", permissions);
 
 		Object.entries(permissions).forEach(([key, value]) => {
@@ -117,6 +141,7 @@ export class ProductionLogger {
 		action: "start" | "progress" | "complete" | "error",
 		details: Record<string, unknown>,
 	) {
+		this.ensureInitialized();
 		const level = action === "error" ? "ERROR" : "INFO";
 		this.log(level, `S3 upload ${action}`, details);
 	}
@@ -125,11 +150,13 @@ export class ProductionLogger {
 		action: "start" | "stop" | "save" | "error",
 		details: Record<string, unknown>,
 	) {
+		this.ensureInitialized();
 		const level = action === "error" ? "ERROR" : "INFO";
 		this.log(level, `Recording ${action}`, details);
 	}
 
 	static logSystemInfo() {
+		this.ensureInitialized();
 		// Logar informações do sistema sempre
 		this.log("INFO", "System information", {
 			platform: process.platform,
@@ -143,6 +170,7 @@ export class ProductionLogger {
 	}
 
 	static logError(error: Error, context?: string) {
+		this.ensureInitialized();
 		this.log("ERROR", `${context ? `[${context}] ` : ""}${error.message}`, {
 			stack: error.stack,
 			name: error.name,
@@ -150,10 +178,35 @@ export class ProductionLogger {
 	}
 
 	static logWarning(message: string, details?: Record<string, unknown>) {
+		this.ensureInitialized();
 		this.log("WARN", message, details);
 	}
 
 	static logInfo(message: string, details?: Record<string, unknown>) {
+		this.ensureInitialized();
 		this.log("INFO", message, details);
+	}
+
+	static logAppStart() {
+		this.ensureInitialized();
+		this.log("INFO", "Application started", {
+			platform: process.platform,
+			arch: process.arch,
+			nodeVersion: process.versions.node,
+			electronVersion: process.versions.electron,
+			chromeVersion: process.versions.chrome,
+			isPackaged: app.isPackaged,
+			appVersion: app.getVersion(),
+			startTime: new Date().toISOString(),
+		});
+	}
+
+	static logAppQuit() {
+		this.ensureInitialized();
+		this.log("INFO", "Application quit", {
+			exitTime: new Date().toISOString(),
+			platform: process.platform,
+			appVersion: app.getVersion(),
+		});
 	}
 }

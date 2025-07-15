@@ -145,9 +145,11 @@ app
 	.whenReady()
 	.then(() => {
 		console.log("App está pronto, inicializando...");
-		// Initialize production logger apenas em desenvolvimento
+		// Initialize production logger sempre
+		ProductionLogger.initialize();
+
+		// Log app start apenas em desenvolvimento
 		if (process.env.NODE_ENV === "development") {
-			ProductionLogger.initialize();
 			ProductionLogger.logAppStart();
 		}
 
@@ -174,7 +176,15 @@ app.on("activate", () => {
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
 app.on("before-quit", () => {
-	ProductionLogger.logAppQuit();
+	try {
+		// Garantir que o logger está inicializado antes de usá-lo
+		if (!ProductionLogger.getLogFilePath()) {
+			ProductionLogger.initialize();
+		}
+		ProductionLogger.logAppQuit();
+	} catch (error) {
+		console.error("Erro ao logar saída da aplicação:", error);
+	}
 });
 
 // Handle deep links

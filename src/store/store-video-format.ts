@@ -319,23 +319,44 @@ export const useVideoFormatStore = create<VideoFormatState>()(
 							break;
 					}
 				} else {
-					// WebM - chunks menores para melhor handling de pause/resume
-					switch (quality) {
-						case "low":
-							bitrate = 1500000; // 1.5 Mbps
-							chunkSize = 3000; // 3 segundos (reduzido de 5s)
-							frameRate = 24;
-							break;
-						case "medium":
-							bitrate = 2500000; // 2.5 Mbps
-							chunkSize = 2000; // 2 segundos (reduzido de 4s)
-							frameRate = 30;
-							break;
-						case "high":
-							bitrate = 4000000; // 4 Mbps
-							chunkSize = 1000; // 1 segundo (reduzido de 3s)
-							frameRate = 30;
-							break;
+					// WebM - configurações otimizadas para Windows
+					if (isWindows) {
+						switch (quality) {
+							case "low":
+								bitrate = 1000000; // 1.0 Mbps (reduzido de 1.5)
+								chunkSize = 1500; // 1.5 segundos (reduzido de 3s)
+								frameRate = 20; // Reduzido de 24
+								break;
+							case "medium":
+								bitrate = 1800000; // 1.8 Mbps (reduzido de 2.5)
+								chunkSize = 1000; // 1 segundo (reduzido de 2s)
+								frameRate = 25; // Reduzido de 30
+								break;
+							case "high":
+								bitrate = 2800000; // 2.8 Mbps (reduzido de 4.0)
+								chunkSize = 800; // 0.8 segundos (reduzido de 1s)
+								frameRate = 30;
+								break;
+						}
+					} else {
+						// WebM em outras plataformas - configurações menos agressivas
+						switch (quality) {
+							case "low":
+								bitrate = 1500000; // 1.5 Mbps
+								chunkSize = 2000; // 2 segundos (reduzido de 3s)
+								frameRate = 24;
+								break;
+							case "medium":
+								bitrate = 2500000; // 2.5 Mbps
+								chunkSize = 1500; // 1.5 segundos (reduzido de 2s)
+								frameRate = 30;
+								break;
+							case "high":
+								bitrate = 4000000; // 4 Mbps
+								chunkSize = 1000; // 1 segundo
+								frameRate = 30;
+								break;
+						}
 					}
 				}
 
@@ -351,7 +372,9 @@ export const useVideoFormatStore = create<VideoFormatState>()(
 							? "MP4-Windows-AntiStutter"
 							: isMP4
 								? "MP4-AntiStutter"
-								: "WebM-AntiStutter",
+								: isWindows
+									? "WebM-Windows-AntiStutter"
+									: "WebM-AntiStutter",
 				};
 			},
 

@@ -230,13 +230,50 @@ export class VideoComposer {
 			document.addEventListener("visibilitychange", () => {
 				this.isPageVisible = !document.hidden;
 
+				console.log("🎬 VideoComposer: Mudança de visibilidade da página", {
+					isPageVisible: this.isPageVisible,
+					isComposing: this.isComposing,
+					useTimer: this.useTimer,
+					pageVisibilityState: document.visibilityState,
+				});
+
 				if (!this.isPageVisible && this.isComposing) {
 					console.warn(
-						"Page hidden - switching to timer for background rendering",
+						"🎬 Página oculta - mudando para timer para renderização em background",
 					);
 					this.switchToTimer();
 				} else if (this.isPageVisible && this.isComposing && this.useTimer) {
-					console.log("Page visible - switching back to requestAnimationFrame");
+					console.log(
+						"🎬 Página visível - voltando para requestAnimationFrame",
+					);
+					this.switchToAnimationFrame();
+				}
+			});
+		}
+
+		// Detectar minimização da janela do Electron
+		if (typeof window !== "undefined") {
+			// Evento padrão do Electron para minimização
+			window.addEventListener("blur", () => {
+				if (this.isComposing && !this.useTimer) {
+					console.log("🎬 Janela perdeu foco - preparando para background");
+					// Aguardar um pouco para ver se é uma minimização real
+					setTimeout(() => {
+						if (document.hidden && this.isComposing && !this.useTimer) {
+							console.log(
+								"🎬 Confirmado: janela minimizada, mudando para timer",
+							);
+							this.switchToTimer();
+						}
+					}, 100);
+				}
+			});
+
+			window.addEventListener("focus", () => {
+				if (this.isComposing && this.useTimer && !document.hidden) {
+					console.log(
+						"🎬 Janela recuperou foco - voltando para requestAnimationFrame",
+					);
 					this.switchToAnimationFrame();
 				}
 			});
@@ -283,28 +320,67 @@ export class VideoComposer {
 
 	// Switch to timer-based rendering
 	private switchToTimer(): void {
+		if (!this.isComposing) return;
+
+		console.log("🎬 VideoComposer: Mudando para renderização por timer", {
+			frameRate: this.options.frameRate,
+			isComposing: this.isComposing,
+			previousMode: this.useTimer ? "timer" : "requestAnimationFrame",
+		});
+
+		// Parar requestAnimationFrame se estiver ativo
 		if (this.animationId) {
 			cancelAnimationFrame(this.animationId);
 			this.animationId = null;
 		}
 
+		// Parar timer anterior se existir
 		if (this.timerId) {
 			clearTimeout(this.timerId);
 			this.timerId = null;
 		}
 
 		this.useTimer = true;
+
+		// Reduzir frame rate para economizar recursos em background
+		const originalFrameRate = this.options.frameRate;
+		this.options.frameRate = Math.min(originalFrameRate, 10); // Máximo 10 FPS em background
+
+		console.log("🎬 Frame rate reduzido para background", {
+			original: originalFrameRate,
+			background: this.options.frameRate,
+		});
+
+		// Iniciar renderização por timer
 		this.startTimerRendering();
 	}
 
 	// Switch to requestAnimationFrame rendering
 	private switchToAnimationFrame(): void {
+		if (!this.isComposing) return;
+
+		console.log("🎬 VideoComposer: Mudando para requestAnimationFrame", {
+			frameRate: this.options.frameRate,
+			isComposing: this.isComposing,
+			previousMode: this.useTimer ? "timer" : "requestAnimationFrame",
+		});
+
+		// Parar timer se estiver ativo
 		if (this.timerId) {
 			clearTimeout(this.timerId);
 			this.timerId = null;
 		}
 
 		this.useTimer = false;
+
+		// Restaurar frame rate original
+		this.options.frameRate = 30; // Restaurar para 30 FPS
+
+		console.log("🎬 Frame rate restaurado para foreground", {
+			frameRate: this.options.frameRate,
+		});
+
+		// Iniciar renderização por requestAnimationFrame
 		this.renderFrame();
 	}
 
@@ -312,127 +388,235 @@ export class VideoComposer {
 	private startTimerRendering(): void {
 		if (!this.isComposing || !this.useTimer) return;
 
-		this.renderFrameContent();
+		try {
+			// Renderizar frame
+			this.renderFrameContent();
 
-		const frameInterval = 1000 / this.options.frameRate; // Convert FPS to interval
-		this.timerId = setTimeout(() => {
-			this.startTimerRendering();
-		}, frameInterval);
+			// Calcular próximo frame
+			const frameInterval = 1000 / this.options.frameRate;
+
+			// Usar setTimeout em vez de setInterval para melhor controle
+			this.timerId = setTimeout(() => {
+				this.startTimerRendering();
+			}, frameInterval);
+
+			// Log ocasional para debug (apenas a cada 5 segundos)
+			if (Math.random() < 0.02) {
+				// ~2% chance, aproximadamente a cada 5 segundos com 10 FPS
+				console.log("🎬 Renderização em background ativa", {
+					frameRate: this.options.frameRate,
+					frameInterval: frameInterval,
+					useTimer: this.useTimer,
+					isComposing: this.isComposing,
+				});
+			}
+		} catch (error) {
+			console.error("🎬 Erro na renderização por timer:", error);
+
+			// Tentar continuar renderização após erro
+			if (this.isComposing && this.useTimer) {
+				this.timerId = setTimeout(() => {
+					this.startTimerRendering();
+				}, 1000); // Aguardar 1 segundo antes de tentar novamente
+			}
+		}
 	}
 
 	// Extract frame rendering logic
 	private renderFrameContent(): void {
 		try {
-			// Limpar canvas
-			this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+			// Verificar se ainda estamos compondo
+			if (!this.isComposing) {
+				console.log("🎬 Renderização cancelada - não está mais compondo");
+				return;
+			}
 
-			// Desenhar tela de fundo ocupando todo o canvas (forçando esticamento)
-			// Agora o vídeo da tela ocupa todo o espaço disponível
-			if (this.screenVideo.readyState >= 2) {
-				// Debug: log das dimensões
-				const videoWidth = this.screenVideo.videoWidth || this.canvas.width;
-				const videoHeight = this.screenVideo.videoHeight || this.canvas.height;
+			// Verificar se o canvas ainda é válido
+			if (!this.canvas || !this.ctx) {
+				console.error("🎬 Canvas ou contexto inválido durante renderização");
+				return;
+			}
 
-				// Verificação uma vez só para detectar problemas
-				if (!this.dimensionsLogged) {
-					const canvasAspectRatio = this.canvas.width / this.canvas.height;
-					const videoAspectRatio = videoWidth / videoHeight;
-					const aspectRatioDiff = Math.abs(
-						canvasAspectRatio - videoAspectRatio,
+			// Verificar se o canvas tem dimensões válidas
+			if (this.canvas.width === 0 || this.canvas.height === 0) {
+				console.error("🎬 Canvas com dimensões inválidas", {
+					width: this.canvas.width,
+					height: this.canvas.height,
+				});
+				return;
+			}
+
+			// Limpar canvas de forma segura
+			try {
+				this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+			} catch (clearError) {
+				console.error("🎬 Erro ao limpar canvas:", clearError);
+				return;
+			}
+
+			// Desenhar tela de fundo ocupando todo o canvas
+			if (this.screenVideo && this.screenVideo.readyState >= 2) {
+				try {
+					// Verificar se o vídeo ainda está válido
+					if (
+						this.screenVideo.videoWidth === 0 ||
+						this.screenVideo.videoHeight === 0
+					) {
+						console.warn("🎬 Vídeo da tela com dimensões inválidas", {
+							videoWidth: this.screenVideo.videoWidth,
+							videoHeight: this.screenVideo.videoHeight,
+							readyState: this.screenVideo.readyState,
+						});
+						return;
+					}
+
+					const videoWidth = this.screenVideo.videoWidth;
+					const videoHeight = this.screenVideo.videoHeight;
+
+					// Verificação uma vez só para detectar problemas
+					if (!this.dimensionsLogged) {
+						const canvasAspectRatio = this.canvas.width / this.canvas.height;
+						const videoAspectRatio = videoWidth / videoHeight;
+						const aspectRatioDiff = Math.abs(
+							canvasAspectRatio - videoAspectRatio,
+						);
+
+						console.log("🎥 VideoComposer renderização:", {
+							canvas: `${this.canvas.width}x${this.canvas.height}`,
+							video: `${videoWidth}x${videoHeight}`,
+							aspectRatios: {
+								canvas: canvasAspectRatio.toFixed(3),
+								video: videoAspectRatio.toFixed(3),
+							},
+							distorção: aspectRatioDiff > 0.01 ? "⚠️ SIM" : "✅ NÃO",
+							renderMode: this.useTimer ? "Timer" : "RequestAnimationFrame",
+						});
+
+						this.dimensionsLogged = true;
+					}
+
+					// Desenhar vídeo de forma segura
+					this.ctx.drawImage(
+						this.screenVideo,
+						0,
+						0, // source x, y
+						videoWidth,
+						videoHeight, // source width, height
+						0,
+						0, // destination x, y
+						this.canvas.width,
+						this.canvas.height, // destination width, height
 					);
-
-					console.log("🎥 VideoComposer renderização:", {
-						canvas: `${this.canvas.width}x${this.canvas.height}`,
-						video: `${videoWidth}x${videoHeight}`,
-						aspectRatios: {
-							canvas: canvasAspectRatio.toFixed(3),
-							video: videoAspectRatio.toFixed(3),
-						},
-						distorção: aspectRatioDiff > 0.01 ? "⚠️ SIM" : "✅ NÃO",
-					});
-
-					this.dimensionsLogged = true;
+				} catch (screenError) {
+					console.error("🎬 Erro ao desenhar vídeo da tela:", screenError);
+					// Preencher com cor sólida em caso de erro
+					this.ctx.fillStyle = "#000000";
+					this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 				}
-
-				// Desenhar vídeo preservando aspect ratio original (sem crop/fill forçado)
-				// Como o canvas já tem as dimensões exatas do vídeo, desenhar diretamente
-				this.ctx.drawImage(
-					this.screenVideo,
-					0,
-					0, // source x, y (usar vídeo completo)
-					videoWidth,
-					videoHeight, // source width, height (usar vídeo completo)
-					0,
-					0, // destination x, y
-					this.canvas.width, // destination width
-					this.canvas.height, // destination height
-				);
+			} else {
+				// Preencher com cor sólida se o vídeo não estiver pronto
+				this.ctx.fillStyle = "#000000";
+				this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 			}
 
 			// Desenhar câmera sobreposicionada se disponível
 			if (this.cameraVideo && this.cameraVideo.readyState >= 2) {
-				const cameraSettings = this.calculateCameraSettings();
+				try {
+					const cameraSettings = this.calculateCameraSettings();
 
-				// Desenhar borda da câmera
-				this.ctx.strokeStyle = "#ffffff";
-				this.ctx.lineWidth = 2;
-				this.ctx.strokeRect(
-					cameraSettings.x - 1,
-					cameraSettings.y - 1,
-					cameraSettings.width + 2,
-					cameraSettings.height + 2,
-				);
+					// Verificar se as configurações da câmera são válidas
+					if (cameraSettings.width <= 0 || cameraSettings.height <= 0) {
+						console.warn(
+							"🎬 Configurações da câmera inválidas",
+							cameraSettings,
+						);
+						return;
+					}
 
-				// Obter dimensões reais da câmera
-				const cameraVideoWidth = this.cameraVideo.videoWidth || 640;
-				const cameraVideoHeight = this.cameraVideo.videoHeight || 480;
-				const cameraAspectRatio = cameraVideoWidth / cameraVideoHeight;
+					// Desenhar borda da câmera
+					this.ctx.strokeStyle = "#ffffff";
+					this.ctx.lineWidth = 2;
+					this.ctx.strokeRect(
+						cameraSettings.x - 1,
+						cameraSettings.y - 1,
+						cameraSettings.width + 2,
+						cameraSettings.height + 2,
+					);
 
-				// Dimensões do espaço disponível para a câmera
-				const targetWidth = cameraSettings.width;
-				const targetHeight = cameraSettings.height;
-				const targetAspectRatio = targetWidth / targetHeight;
+					// Obter dimensões reais da câmera
+					const cameraVideoWidth = this.cameraVideo.videoWidth || 640;
+					const cameraVideoHeight = this.cameraVideo.videoHeight || 480;
 
-				// Calcular dimensões de renderização que preservem o aspect ratio (object-fit: contain)
-				let renderWidth = targetWidth;
-				let renderHeight = targetHeight;
-				let offsetX = 0;
-				let offsetY = 0;
+					// Verificar se as dimensões da câmera são válidas
+					if (cameraVideoWidth <= 0 || cameraVideoHeight <= 0) {
+						console.warn("🎬 Dimensões da câmera inválidas", {
+							cameraVideoWidth,
+							cameraVideoHeight,
+						});
+						return;
+					}
 
-				if (cameraAspectRatio > targetAspectRatio) {
-					// Câmera é mais larga - ajustar altura
-					renderHeight = targetWidth / cameraAspectRatio;
-					offsetY = (targetHeight - renderHeight) / 2;
-				} else {
-					// Câmera é mais alta - ajustar largura
-					renderWidth = targetHeight * cameraAspectRatio;
-					offsetX = (targetWidth - renderWidth) / 2;
+					const cameraAspectRatio = cameraVideoWidth / cameraVideoHeight;
+
+					// Dimensões do espaço disponível para a câmera
+					const targetWidth = cameraSettings.width;
+					const targetHeight = cameraSettings.height;
+					const targetAspectRatio = targetWidth / targetHeight;
+
+					// Calcular dimensões de renderização que preservem o aspect ratio
+					let renderWidth = targetWidth;
+					let renderHeight = targetHeight;
+					let offsetX = 0;
+					let offsetY = 0;
+
+					if (cameraAspectRatio > targetAspectRatio) {
+						// Câmera é mais larga - ajustar altura
+						renderHeight = targetWidth / cameraAspectRatio;
+						offsetY = (targetHeight - renderHeight) / 2;
+					} else {
+						// Câmera é mais alta - ajustar largura
+						renderWidth = targetHeight * cameraAspectRatio;
+						offsetX = (targetWidth - renderWidth) / 2;
+					}
+
+					// Preencher fundo da área da câmera com preto
+					this.ctx.fillStyle = "#000000";
+					this.ctx.fillRect(
+						cameraSettings.x,
+						cameraSettings.y,
+						cameraSettings.width,
+						cameraSettings.height,
+					);
+
+					// Desenhar câmera preservando aspect ratio
+					this.ctx.drawImage(
+						this.cameraVideo,
+						0,
+						0, // source x, y
+						cameraVideoWidth,
+						cameraVideoHeight, // source width, height
+						cameraSettings.x + offsetX,
+						cameraSettings.y + offsetY, // destination x, y
+						renderWidth,
+						renderHeight, // destination width, height
+					);
+				} catch (cameraError) {
+					console.error("🎬 Erro ao desenhar câmera:", cameraError);
+					// Continuar sem a câmera em caso de erro
 				}
-
-				// Preencher fundo da área da câmera com preto
-				this.ctx.fillStyle = "#000000";
-				this.ctx.fillRect(
-					cameraSettings.x,
-					cameraSettings.y,
-					cameraSettings.width,
-					cameraSettings.height,
-				);
-
-				// Desenhar câmera preservando aspect ratio (como object-fit: contain)
-				this.ctx.drawImage(
-					this.cameraVideo,
-					0,
-					0, // source x, y (usar câmera completa)
-					cameraVideoWidth,
-					cameraVideoHeight, // source width, height (usar câmera completa)
-					cameraSettings.x + offsetX,
-					cameraSettings.y + offsetY, // destination x, y (com offset para centralizar)
-					renderWidth,
-					renderHeight, // destination width, height (preservando aspect ratio)
-				);
 			}
 		} catch (error) {
-			console.error("Erro ao renderizar frame:", error);
+			console.error("🎬 Erro crítico ao renderizar frame:", error);
+
+			// Tentar recuperar limpando o canvas
+			try {
+				if (this.ctx && this.canvas) {
+					this.ctx.fillStyle = "#000000";
+					this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+				}
+			} catch (recoveryError) {
+				console.error("🎬 Não foi possível recuperar o canvas:", recoveryError);
+			}
 		}
 	}
 
