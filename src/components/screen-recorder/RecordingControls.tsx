@@ -6,7 +6,6 @@ import { useCameraConfigStore } from "@/store/store-camera-config";
 import { useMicrophoneConfigStore } from "@/store/store-microphone-config";
 import { useHeaderConfigStore } from "@/store/store-header-config";
 import { useToastHelpers } from "@/components/Toast";
-import { minimizeWindow } from "@/helpers/window_helpers";
 import {
 	Play,
 	Square,
@@ -151,15 +150,15 @@ export function RecordingControls({
 			await startCountdown();
 
 			// Não minimizar janela no modo câmera apenas
-			if (!isCameraOnlyMode) {
-				try {
-					await minimizeWindow();
-				} catch (error) {
-					console.warn("Erro ao minimizar janela:", error);
-				}
-				// Aguardar um pouco para garantir que a janela foi minimizada
-				await new Promise((resolve) => setTimeout(resolve, 500));
-			}
+			// if (!isCameraOnlyMode) {
+			// 	try {
+			// 		await minimizeWindow();
+			// 	} catch (error) {
+			// 		console.warn("Erro ao minimizar janela:", error);
+			// 	}
+			// 	// Aguardar um pouco para garantir que a janela foi minimizada
+			// 	await new Promise((resolve) => setTimeout(resolve, 500));
+			// }
 
 			const options = AdvancedScreenRecorderManager.getRecommendedOptions(
 				selectedSourceId.id,

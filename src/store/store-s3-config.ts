@@ -23,13 +23,13 @@ interface S3ConfigState {
 }
 
 const defaultConfig: S3Config = {
-	isEnabled: false,
-	accessKeyId: "",
-	secretAccessKey: "",
+	isEnabled: true,
+	accessKeyId: "AKIAR2BBM366CLZUC74Q",
+	secretAccessKey: "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",
 	region: "us-east-1",
-	bucketName: "",
+	bucketName: "cardiopicreport",
 	folderPrefix: "recordings",
-	isConfigured: false,
+	isConfigured: true,
 };
 
 export const useS3ConfigStore = create<S3ConfigState>()(

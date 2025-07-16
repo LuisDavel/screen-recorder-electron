@@ -18,6 +18,14 @@ let isRecording = false;
 let isAppQuiting = false;
 let translucencyTimeout: NodeJS.Timeout | null = null;
 
+// Função para garantir que minimização está bloqueada
+function ensureMinimizationBlocked() {
+	if (mainWindow && !mainWindow.isDestroyed()) {
+		mainWindow.setMinimizable(false);
+		console.log("⛔ Minimização bloqueada completamente");
+	}
+}
+
 // Power save blocker IDs
 let systemSleepBlockerId: number | null = null;
 let displaySleepBlockerId: number | null = null;
@@ -71,7 +79,7 @@ function createWindow() {
 		fullscreenable: true,
 		vibrancy: undefined,
 	});
-
+	mainWindow.removeMenu();
 	console.log("Registrando IPC listeners...");
 	try {
 		registerListeners(mainWindow);
@@ -137,7 +145,8 @@ function createWindow() {
 		}, 1000);
 	});
 
-	// Minimização já está bloqueada via minimizable: false
+	// Aplicar bloqueio de minimização imediatamente
+	ensureMinimizationBlocked();
 
 	// Controle inteligente de fechamento
 	mainWindow.on("close", (event) => {
@@ -235,7 +244,7 @@ function startTranslucencyTimer() {
 	console.log("⏱️ Iniciando timer de translucidez (3 segundos)");
 	translucencyTimeout = setTimeout(() => {
 		console.log("🌫️ Ativando modo translúcido");
-		setWindowOpacity(0.7); // 70% de opacidade
+		setWindowOpacity(0.8); // 70% de opacidade
 	}, 3000);
 }
 
@@ -266,10 +275,30 @@ function setupBackgroundRecordingHandlers() {
 				`🔄 Status de gravação sincronizado: ${isRecording ? "ativado" : "desativado"}`,
 			);
 
-			// Se parar de gravar, voltar opacidade normal
+			// Reforçar bloqueio de minimização durante gravação
+			if (isRecording) {
+				console.log("🔒 Reforçando bloqueio de minimização durante gravação");
+				ensureMinimizationBlocked();
+			} else {
+				console.log("🔓 Gravação parada - mantendo bloqueio de minimização");
+				// Manter bloqueio mesmo após parar gravação
+				ensureMinimizationBlocked();
+			}
+
+			// Se parar de gravar, voltar opacidade normal apenas se janela estiver em foco
 			if (!isRecording) {
 				clearTranslucencyTimer();
-				setWindowOpacity(1.0);
+				if (mainWindow && mainWindow.isFocused()) {
+					console.log(
+						"🌫️ Gravação parada - janela em foco, removendo translucidez",
+					);
+					setWindowOpacity(1.0);
+				} else {
+					console.log(
+						"🌫️ Gravação parada - janela em background, iniciando timer",
+					);
+					startTranslucencyTimer();
+				}
 			}
 		}
 		return { success: true, isRecording };
@@ -302,6 +331,12 @@ function setupBackgroundRecordingHandlers() {
 	// Keep alive
 	ipcMain.handle("keep-alive", async () => {
 		return { alive: true, timestamp: Date.now() };
+	});
+
+	// Reforçar bloqueio de minimização
+	ipcMain.handle("ensure-minimization-blocked", async () => {
+		ensureMinimizationBlocked();
+		return { success: true, blocked: true };
 	});
 
 	console.log("📡 IPC handlers para background recording configurados");

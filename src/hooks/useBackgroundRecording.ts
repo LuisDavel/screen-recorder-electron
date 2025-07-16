@@ -45,13 +45,25 @@ export function useBackgroundRecording(): BackgroundRecordingState &
 
 					// Ativar translucidez quando começar a gravar
 					if (status) {
-						await backgroundAPI.setWindowOpacity(0.7);
+						await backgroundAPI.setWindowOpacity(0.8);
 						console.log(
 							"🌫️ Translucidez ativada automaticamente durante gravação",
+						);
+
+						// Reforçar bloqueio de minimização durante gravação
+						await backgroundAPI.ensureMinimizationBlocked();
+						console.log(
+							"🔒 Bloqueio de minimização reforçado durante gravação",
 						);
 					} else {
 						await backgroundAPI.setWindowOpacity(1.0);
 						console.log("🌫️ Translucidez removida após parar gravação");
+
+						// Manter bloqueio de minimização mesmo após parar
+						await backgroundAPI.ensureMinimizationBlocked();
+						console.log(
+							"🔒 Bloqueio de minimização mantido após parar gravação",
+						);
 					}
 				}
 			} catch (error) {
@@ -106,7 +118,7 @@ export function useBackgroundRecording(): BackgroundRecordingState &
 		}
 	}, [backgroundAPI]);
 
-	// Keep alive system
+	// Keep alive system e bloqueio de minimização
 	useEffect(() => {
 		if (!backgroundAPI) return;
 
@@ -117,6 +129,11 @@ export function useBackgroundRecording(): BackgroundRecordingState &
 					keepAliveStatus: result.alive,
 					lastKeepAlive: result.timestamp,
 				});
+
+				// Reforçar bloqueio de minimização durante gravação
+				if (state.isRecording) {
+					await backgroundAPI.ensureMinimizationBlocked();
+				}
 			} catch (error) {
 				console.error("Keep alive error:", error);
 				updateState({ keepAliveStatus: false });
@@ -127,7 +144,7 @@ export function useBackgroundRecording(): BackgroundRecordingState &
 		return () => {
 			clearInterval(keepAliveInterval);
 		};
-	}, [backgroundAPI, updateState]);
+	}, [backgroundAPI, updateState, state.isRecording]);
 
 	return {
 		...state,

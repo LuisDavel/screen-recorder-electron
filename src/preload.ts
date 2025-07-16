@@ -16,6 +16,10 @@ interface BackgroundRecordingAPI {
 		opacity: number,
 	) => Promise<{ success: boolean; opacity: number }>;
 	keepAlive: () => Promise<{ alive: boolean; timestamp: number }>;
+	ensureMinimizationBlocked: () => Promise<{
+		success: boolean;
+		blocked: boolean;
+	}>;
 }
 
 // Estender o window com backgroundRecordingAPI
@@ -41,6 +45,10 @@ contextBridge.exposeInMainWorld("backgroundRecordingAPI", {
 
 	// Keep alive
 	keepAlive: () => ipcRenderer.invoke("keep-alive"),
+
+	// Reforçar bloqueio de minimização
+	ensureMinimizationBlocked: () =>
+		ipcRenderer.invoke("ensure-minimization-blocked"),
 });
 
 // Escutar eventos de background mode do main process (legacy)

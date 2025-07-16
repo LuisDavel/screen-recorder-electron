@@ -739,14 +739,54 @@ export class AdvancedScreenRecorderManager {
 
 		console.warn("⚠️ Formato selecionado não suportado, tentando fallback");
 
-		// Fallback to supported types (otimizado para performance)
-		const supportedTypes = [
-			"video/webm; codecs=vp8", // VP8 é mais leve que VP9
+		// Fallback to supported types (otimizado para performance e áudio)
+		const supportedTypes = [];
+
+		if (
+			videoFormatState.format === "mp4" ||
+			videoFormatState.format === "whatsapp"
+		) {
+			// Para MP4, priorizar formatos que suportam áudio adequadamente
+			const hasAudio =
+				this.finalStream && this.finalStream.getAudioTracks().length > 0;
+
+			if (hasAudio) {
+				// Mime types específicos para MP4 com áudio
+				supportedTypes.push(
+					'video/mp4; codecs="avc1.42E01E, mp4a.40.2"', // H.264 + AAC
+					'video/mp4; codecs="avc1.42001E, mp4a.40.2"', // H.264 Baseline + AAC
+					'video/mp4; codecs="h264, aac"', // H.264 + AAC alternativo
+					"video/mp4; codecs=avc1.42E01E", // H.264 Extended
+					"video/mp4; codecs=avc1.42001E", // H.264 Baseline
+					"video/mp4; codecs=h264", // H.264 básico
+					"video/mp4", // MP4 básico
+				);
+			} else {
+				// Mime types para MP4 sem áudio
+				supportedTypes.push(
+					"video/mp4; codecs=avc1.42E01E", // H.264 Extended
+					"video/mp4; codecs=avc1.42001E", // H.264 Baseline
+					"video/mp4; codecs=h264", // H.264 básico
+					"video/mp4", // MP4 básico
+				);
+			}
+		} else {
+			// Para WebM, usar configurações otimizadas
+			supportedTypes.push(
+				"video/webm; codecs=vp8", // VP8 é mais leve que VP9
+				"video/webm; codecs=vp9",
+				"video/webm",
+			);
+		}
+
+		// Fallback final para qualquer formato suportado
+		supportedTypes.push(
+			"video/webm; codecs=vp8",
 			"video/webm; codecs=vp9",
 			"video/webm",
-			"video/mp4", // MP4 básico sem codec específico para melhor compatibilidade
+			"video/mp4",
 			"video/mp4; codecs=h264",
-		];
+		);
 
 		for (const type of supportedTypes) {
 			const supported = MediaRecorder.isTypeSupported(type);
@@ -932,6 +972,56 @@ export class AdvancedScreenRecorderManager {
 
 			recordingOptions.videoBitsPerSecond = finalBitrate;
 			console.log("🎯 Bitrate configurado:", finalBitrate);
+
+			// Configurar bitrate de áudio específico para MP4
+			if (
+				videoFormatState.format === "mp4" ||
+				videoFormatState.format === "whatsapp"
+			) {
+				// Configurar bitrate de áudio baseado na qualidade e plataforma
+				let audioBitrate: number;
+
+				if (isWindows) {
+					// Configurações mais conservadoras para Windows
+					switch (videoFormatState.quality) {
+						case "low":
+							audioBitrate = 64000; // 64 kbps
+							break;
+						case "medium":
+							audioBitrate = 96000; // 96 kbps
+							break;
+						case "high":
+							audioBitrate = 128000; // 128 kbps
+							break;
+						default:
+							audioBitrate = 96000;
+					}
+				} else {
+					// Configurações normais para outras plataformas
+					switch (videoFormatState.quality) {
+						case "low":
+							audioBitrate = 96000; // 96 kbps
+							break;
+						case "medium":
+							audioBitrate = 128000; // 128 kbps
+							break;
+						case "high":
+							audioBitrate = 192000; // 192 kbps
+							break;
+						default:
+							audioBitrate = 128000;
+					}
+				}
+
+				// Aplicar bitrate de áudio apenas se há áudio no stream
+				if (this.finalStream.getAudioTracks().length > 0) {
+					recordingOptions.audioBitsPerSecond = audioBitrate;
+					console.log(
+						"🎤 Bitrate de áudio configurado para MP4:",
+						audioBitrate,
+					);
+				}
+			}
 
 			this.mediaRecorder = new MediaRecorder(
 				this.finalStream,
