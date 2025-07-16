@@ -156,4 +156,18 @@ export class ProductionLogger {
 	static logInfo(message: string, details?: Record<string, unknown>) {
 		this.log("INFO", message, details);
 	}
+
+	static logAppStart() {
+		this.log("INFO", "Application started", {
+			timestamp: new Date().toISOString(),
+			platform: process.platform,
+			nodeEnv: process.env.NODE_ENV,
+		});
+	}
+
+	static logAppQuit() {
+		this.log("INFO", "Application quit", {
+			timestamp: new Date().toISOString(),
+		});
+	}
 }

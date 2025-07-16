@@ -38,6 +38,12 @@ export class VideoComposer {
 	private isPageVisible = true;
 	private useTimer = false;
 	private dimensionsLogged = false;
+	private renderingQuality = 1.0;
+	private backgroundModeData: {
+		originalFrameRate: number;
+		originalQuality: number;
+		isActive: boolean;
+	} | null = null;
 
 	// Configurações padrão
 	private options: Required<
@@ -246,39 +252,247 @@ export class VideoComposer {
 	// Listen for background mode events from window
 	private setupBackgroundListeners(): void {
 		if (typeof window !== "undefined") {
+			// Listen for background recording events
+			window.addEventListener(
+				"background-recording-activated",
+				(event: Event) => {
+					const customEvent = event as CustomEvent;
+					const data = customEvent.detail;
+
+					console.log(
+						"VideoComposer: Background recording event received:",
+						data,
+					);
+
+					if (data.enabled && this.isComposing) {
+						console.log(
+							"VideoComposer: Switching to background mode - timer-based rendering",
+						);
+						this.activateBackgroundMode();
+					} else if (!data.enabled && this.isComposing) {
+						console.log("VideoComposer: Switching back from background mode");
+						this.deactivateBackgroundMode();
+					}
+				},
+			);
+
+			// Listen for the improved background mode events
+			window.addEventListener(
+				"background-recording-mode-activated",
+				(event: Event) => {
+					const customEvent = event as CustomEvent;
+					const data = customEvent.detail;
+
+					if (data.enabled && this.isComposing) {
+						console.log(
+							"VideoComposer: Background recording mode activated",
+							data,
+						);
+						this.activateBackgroundRecordingMode(data);
+					} else if (!data.enabled && this.isComposing) {
+						console.log("VideoComposer: Background recording mode deactivated");
+						this.deactivateBackgroundRecordingMode();
+					}
+				},
+			);
+
+			// Legacy support for the old event
 			window.addEventListener("recording-background-mode", (event: Event) => {
 				const enabled = (event as CustomEvent).detail.enabled;
 
 				if (enabled && this.isComposing) {
-					console.log("VideoComposer: Background mode enabled");
+					console.log("VideoComposer: Background mode enabled (legacy)");
 					this.switchToTimer();
 					this.reduceRenderingOperations();
 				} else if (!enabled && this.isComposing && this.useTimer) {
-					console.log("VideoComposer: Background mode disabled");
+					console.log("VideoComposer: Background mode disabled (legacy)");
 					this.switchToAnimationFrame();
 					this.resumeNormalRendering();
+				}
+			});
+
+			// Listen for document visibility changes
+			document.addEventListener("visibilitychange", () => {
+				if (this.isComposing) {
+					const isHidden = document.hidden;
+					console.log(
+						"VideoComposer: Document visibility changed:",
+						isHidden ? "hidden" : "visible",
+					);
+
+					if (isHidden) {
+						this.activateBackgroundRecordingMode({
+							enabled: true,
+							highPerformance: true,
+							optimizations: {
+								enableTimerMode: true,
+								frameRateOverride: 30,
+								disableAnimations: true,
+								reduceQuality: false,
+							},
+						});
+					} else {
+						this.deactivateBackgroundRecordingMode();
+					}
 				}
 			});
 		}
 	}
 
-	// Reduce rendering operations for background mode
+	// Activate background mode - optimized for background processing
+	private activateBackgroundMode(): void {
+		console.log(
+			"🔲 VideoComposer: Ativando modo background - renderização otimizada",
+		);
+
+		// Force timer-based rendering for consistent performance
+		this.switchToTimer();
+
+		// Apply background-specific optimizations
+		this.options.frameRate = 30; // Stable frame rate for background mode
+
+		// Store original settings for restoration
+		if (!this.backgroundModeData) {
+			this.backgroundModeData = {
+				originalFrameRate: this.options.frameRate,
+				originalQuality: this.renderingQuality,
+				isActive: true,
+			};
+		}
+
+		// Restart timer with new settings
+		this.switchToTimer();
+
+		console.log("✅ VideoComposer: Modo background ativado com sucesso");
+	}
+
+	// Deactivate background mode
+	private deactivateBackgroundMode(): void {
+		console.log("🪟 VideoComposer: Desativando modo background");
+
+		// Restore original settings
+		if (this.backgroundModeData) {
+			this.options.frameRate = this.backgroundModeData.originalFrameRate;
+			this.renderingQuality = this.backgroundModeData.originalQuality;
+			this.backgroundModeData = null;
+		}
+
+		// Keep using timer for consistency - don't switch back to animation frame
+		// This prevents stuttering when switching between modes
+		this.switchToTimer();
+
+		console.log("✅ VideoComposer: Modo tray desativado");
+	}
+
+	// Legacy method for backward compatibility
 	private reduceRenderingOperations(): void {
 		console.log(
 			"VideoComposer: Reducing rendering operations for background mode",
 		);
-		// Reduce frame rate in background
+		// Reduce to 15 FPS in background to save resources
 		if (this.useTimer) {
-			// Reduce to 15 FPS in background to save resources
 			this.options.frameRate = Math.min(this.options.frameRate, 15);
 		}
 	}
 
-	// Resume normal rendering operations
+	// Activate background recording mode with optimizations
+	private activateBackgroundRecordingMode(data: {
+		enabled: boolean;
+		highPerformance?: boolean;
+		optimizations?: {
+			enableTimerMode?: boolean;
+			frameRateOverride?: number;
+			disableAnimations?: boolean;
+			reduceQuality?: boolean;
+		};
+	}): void {
+		console.log(
+			"🎬 VideoComposer: Ativando modo background recording otimizado",
+		);
+
+		// Force timer-based rendering for consistent performance
+		this.switchToTimer();
+
+		// Apply optimizations based on the configuration
+		if (data.optimizations?.frameRateOverride) {
+			const targetFrameRate = data.optimizations.frameRateOverride;
+			console.log(
+				`🎯 VideoComposer: Configurando frame rate para ${targetFrameRate}fps`,
+			);
+			this.options.frameRate = targetFrameRate;
+			this.switchToTimer(); // Restart timer with new frame rate
+		}
+
+		// Reduce rendering operations but maintain video quality
+		this.reduceBackgroundRenderingOperations();
+
+		// Store original settings for restoration
+		if (!this.backgroundModeData) {
+			this.backgroundModeData = {
+				originalFrameRate: this.options.frameRate,
+				originalQuality: this.renderingQuality,
+				isActive: true,
+			};
+		}
+	}
+
+	// Deactivate background recording mode
+	private deactivateBackgroundRecordingMode(): void {
+		console.log("🔄 VideoComposer: Desativando modo background recording");
+
+		// Restore original settings
+		if (this.backgroundModeData) {
+			this.options.frameRate = this.backgroundModeData.originalFrameRate;
+			this.renderingQuality = this.backgroundModeData.originalQuality;
+			this.backgroundModeData = null;
+		}
+
+		// Resume normal rendering operations
+		this.resumeNormalRendering();
+
+		// Keep using timer for consistency - don't switch back to animation frame
+		// This prevents stuttering when switching between modes
+		this.switchToTimer();
+	}
+
+	// Reduce rendering operations for background mode - optimized
+	private reduceBackgroundRenderingOperations(): void {
+		console.log(
+			"🔧 VideoComposer: Aplicando otimizações para background recording",
+		);
+
+		// Maintain stable frame rate for recording quality
+		// Don't reduce frame rate below 15fps to avoid stuttering
+		if (this.options.frameRate > 15) {
+			const targetFrameRate = Math.max(
+				15,
+				Math.min(this.options.frameRate, 30),
+			);
+			console.log(
+				`🎯 Frame rate otimizado para background: ${targetFrameRate}fps`,
+			);
+			this.options.frameRate = targetFrameRate;
+		}
+
+		// Optimize rendering quality for background (maintain video quality)
+		this.renderingQuality = 0.95; // Slightly reduce quality to save resources
+
+		// Force timer-based rendering for consistent performance
+		this.switchToTimer();
+	}
+
+	// Resume normal rendering operations - improved
 	private resumeNormalRendering(): void {
-		console.log("VideoComposer: Resuming normal rendering operations");
-		// Restore original frame rate
-		this.options.frameRate = 30; // Reset to default
+		console.log(
+			"🔄 VideoComposer: Restaurando operações normais de renderização",
+		);
+
+		// Restore original rendering quality
+		this.renderingQuality = 1.0;
+
+		// Don't automatically switch to animation frame - let the timer continue
+		// This prevents stuttering when switching between modes
+		console.log("✅ VideoComposer: Operações normais restauradas");
 	}
 
 	// Switch to timer-based rendering

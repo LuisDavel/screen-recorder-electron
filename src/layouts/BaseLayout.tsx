@@ -1,15 +1,14 @@
 import React from "react";
-import { DragWindowRegion } from "@/components/DragWindowRegion";
 
-export default function BaseLayout({
-	children,
-}: {
+interface BaseLayoutProps {
 	children: React.ReactNode;
-}) {
+}
+
+export default function BaseLayout({ children }: BaseLayoutProps) {
 	return (
 		<>
-			<DragWindowRegion />
-			<main className="h-screen p-6 pb-20">{children}</main>
+			{/* Conteúdo principal */}
+			<>{children}</>
 		</>
 	);
 }

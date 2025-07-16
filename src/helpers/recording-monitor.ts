@@ -153,26 +153,82 @@ export class RecordingMonitor {
 		return RecordingMonitor.instance;
 	}
 
-	// Setup visibility detection
+	// Setup visibility detection - melhorado para background recording
 	private setupVisibilityDetection(): void {
 		if (typeof document !== "undefined") {
 			document.addEventListener("visibilitychange", () => {
 				const visible = !document.hidden;
+				console.log("Document visibility changed:", visible);
 				useRecordingMonitorStore.getState().updateWindowVisibility(visible);
 			});
 		}
 
-		// Electron-specific window events
-		if (typeof window !== "undefined" && (window as any).electronAPI) {
-			(window as any).electronAPI.onWindowMinimized?.(() => {
-				console.log("Electron window minimized");
+		// Electron-specific window events - integração com novos IPC events
+		if (
+			typeof window !== "undefined" &&
+			(
+				window as unknown as {
+					electronWindow?: {
+						onMinimized: (cb: () => void) => void;
+						onRestored: (cb: () => void) => void;
+						onFocus: (cb: () => void) => void;
+						onBlur: (cb: () => void) => void;
+					};
+				}
+			).electronWindow
+		) {
+			// Registrar listeners para eventos de janela
+			const electronWindow = (
+				window as unknown as {
+					electronWindow: {
+						onMinimized: (cb: () => void) => void;
+						onRestored: (cb: () => void) => void;
+						onFocus: (cb: () => void) => void;
+						onBlur: (cb: () => void) => void;
+					};
+				}
+			).electronWindow;
+
+			electronWindow.onMinimized(() => {
+				console.log("Electron window minimized - ativando background mode");
 				this.handleWindowMinimized();
 			});
 
-			(window as any).electronAPI.onWindowRestored?.(() => {
-				console.log("Electron window restored");
+			electronWindow.onRestored(() => {
+				console.log("Electron window restored - desativando background mode");
 				this.handleWindowRestored();
 			});
+
+			electronWindow.onFocus(() => {
+				console.log("Electron window focused - modo normal");
+				this.handleWindowFocus();
+			});
+
+			electronWindow.onBlur(() => {
+				console.log("Electron window blurred - modo background");
+				this.handleWindowBlur();
+			});
+		}
+
+		// Listener para eventos de background mode aprimorados do main process
+		if (typeof window !== "undefined") {
+			window.addEventListener("background-recording-mode-activated", ((
+				event: CustomEvent,
+			) => {
+				console.log(
+					"Background recording mode activated (advanced):",
+					event.detail,
+				);
+				this.handleAdvancedBackgroundModeChange(event.detail);
+			}) as EventListener);
+
+			// Manter compatibilidade com eventos legados
+			window.addEventListener("background-mode-activated", ((
+				event: CustomEvent,
+			) => {
+				console.log("Background mode activated (legacy):", event.detail);
+				this.handleBackgroundModeChange(event.detail);
+			}) as EventListener);
 		}
 
 		// Backup visibility check for edge cases
@@ -259,6 +315,141 @@ export class RecordingMonitor {
 	private handleWindowRestored(): void {
 		console.log("Window restored - switching back to normal mode");
 		this.disableBackgroundMode();
+	}
+
+	private handleWindowFocus(): void {
+		console.log("Window focused - switching to normal mode");
+		const { updateWindowVisibility } = useRecordingMonitorStore.getState();
+		updateWindowVisibility(true);
+		this.disableBackgroundMode();
+	}
+
+	private handleWindowBlur(): void {
+		const { isAnyRecordingActive } = useRecordingMonitorStore.getState();
+		if (isAnyRecordingActive) {
+			console.log("Window blurred during recording - enabling background mode");
+			this.enableBackgroundMode();
+		}
+	}
+
+	private handleBackgroundModeChange(enabled: boolean): void {
+		const { isAnyRecordingActive } = useRecordingMonitorStore.getState();
+		if (isAnyRecordingActive) {
+			if (enabled) {
+				console.log("Background mode activated by main process");
+				this.enableBackgroundMode();
+			} else {
+				console.log("Background mode deactivated by main process");
+				this.disableBackgroundMode();
+			}
+		}
+	}
+
+	// Novo handler para eventos de background mode aprimorados
+	private handleAdvancedBackgroundModeChange(data: {
+		enabled: boolean;
+		highPerformance?: boolean;
+		optimizations?: {
+			enableTimerMode?: boolean;
+			frameRateOverride?: number;
+			disableAnimations?: boolean;
+			reduceQuality?: boolean;
+		};
+	}): void {
+		const { isAnyRecordingActive } = useRecordingMonitorStore.getState();
+
+		if (isAnyRecordingActive) {
+			if (data.enabled) {
+				console.log(
+					"🎬 Advanced background mode activated - high performance recording",
+				);
+				this.enableAdvancedBackgroundMode(data);
+			} else {
+				console.log(
+					"🔄 Advanced background mode deactivated - normal operation",
+				);
+				this.disableAdvancedBackgroundMode();
+			}
+		}
+	}
+
+	// Ativar modo background avançado
+	private enableAdvancedBackgroundMode(data: {
+		enabled: boolean;
+		highPerformance?: boolean;
+		optimizations?: {
+			enableTimerMode?: boolean;
+			frameRateOverride?: number;
+			disableAnimations?: boolean;
+			reduceQuality?: boolean;
+		};
+	}): void {
+		console.log("🚀 Enabling advanced background recording mode");
+
+		// Notify listeners to switch to optimized rendering
+		this.notifyListeners("advancedBackgroundModeEnabled", data);
+
+		// Apply CSS optimizations
+		if (data.optimizations?.disableAnimations) {
+			document.body.classList.add("recording-background-mode");
+		}
+
+		// Reduce non-essential operations
+		this.reduceBackgroundOperations();
+
+		// Apply frame rate optimizations
+		if (data.optimizations?.frameRateOverride) {
+			console.log(
+				`🎯 Frame rate override: ${data.optimizations.frameRateOverride}fps`,
+			);
+		}
+
+		// Show enhanced performance notification
+		this.showAdvancedBackgroundNotification(data);
+	}
+
+	// Desativar modo background avançado
+	private disableAdvancedBackgroundMode(): void {
+		console.log("🔄 Disabling advanced background recording mode");
+
+		// Notify listeners to switch back to normal rendering
+		this.notifyListeners("advancedBackgroundModeDisabled", {});
+
+		// Remove CSS optimizations
+		document.body.classList.remove("recording-background-mode");
+
+		// Resume normal operations
+		this.resumeNormalOperations();
+	}
+
+	// Mostrar notificação de background recording avançado
+	private showAdvancedBackgroundNotification(data: {
+		enabled: boolean;
+		highPerformance?: boolean;
+		optimizations?: {
+			enableTimerMode?: boolean;
+			frameRateOverride?: number;
+			disableAnimations?: boolean;
+			reduceQuality?: boolean;
+		};
+	}): void {
+		// Only show notification if high performance mode is enabled
+		if (data.highPerformance) {
+			console.log("🎬 High performance background recording active");
+
+			// Dispatch custom event for UI components
+			if (typeof window !== "undefined") {
+				window.dispatchEvent(
+					new CustomEvent("background-recording-status-changed", {
+						detail: {
+							active: true,
+							highPerformance: true,
+							optimizations: data.optimizations,
+						},
+					}),
+				);
+			}
+		}
 	}
 
 	// Background mode management
@@ -398,7 +589,10 @@ class PerformanceMonitor {
 		// Memory usage
 		if ("memory" in performance) {
 			this.metrics.memoryUsage =
-				(performance as any).memory.usedJSHeapSize / 1024 / 1024; // MB
+				(performance as unknown as { memory: { usedJSHeapSize: number } })
+					.memory.usedJSHeapSize /
+				1024 /
+				1024; // MB
 		}
 
 		// FPS estimation (simplified)
