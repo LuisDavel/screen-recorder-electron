@@ -2,13 +2,13 @@ import { app, BrowserWindow, powerSaveBlocker, ipcMain } from "electron";
 import registerListeners from "./helpers/ipc/listeners-register";
 import { PermissionsHelper } from "./helpers/permissions-helper";
 import { ProductionLogger } from "./helpers/production-logger";
-// "electron-squirrel-startup" seems broken when packaging with vite
-//import started from "electron-squirrel-startup";
+
 import path from "path";
 import {
 	installExtension,
 	REACT_DEVELOPER_TOOLS,
 } from "electron-devtools-installer";
+import { ClientRequest } from "./types/request";
 
 const inDevelopment = process.env.NODE_ENV === "development";
 
@@ -80,10 +80,8 @@ function createWindow() {
 		vibrancy: undefined,
 	});
 	mainWindow.removeMenu();
-	console.log("Registrando IPC listeners...");
 	try {
 		registerListeners(mainWindow);
-		console.log("✅ registerListeners chamado com sucesso");
 	} catch (error) {
 		console.error("❌ Erro ao chamar registerListeners:", error);
 		throw error;
@@ -93,7 +91,6 @@ function createWindow() {
 	mainWindow.webContents.session.setPermissionRequestHandler(
 		(webContents, permission, callback) => {
 			if (permission === "media") {
-				console.log("Requesting media permission from system");
 				callback(true);
 			} else {
 				callback(false);
@@ -118,7 +115,6 @@ function createWindow() {
 
 	// Show window when ready
 	mainWindow.once("ready-to-show", async () => {
-		console.log("Janela principal pronta para exibir");
 		mainWindow?.show();
 		mainWindow?.focus();
 
@@ -129,7 +125,6 @@ function createWindow() {
 		try {
 			const needsPermissions = await PermissionsHelper.needsPermissionSetup();
 			if (needsPermissions) {
-				console.log("Requesting system permissions...");
 				await PermissionsHelper.requestPermissions();
 			}
 		} catch (error) {
@@ -140,7 +135,6 @@ function createWindow() {
 		setTimeout(() => {
 			if (mainWindow) {
 				mainWindow.webContents.setBackgroundThrottling(false);
-				console.log("🚀 Background throttling desabilitado definitivamente");
 			}
 		}, 1000);
 	});
@@ -475,6 +469,38 @@ app.on("before-quit", () => {
 	ProductionLogger.logAppQuit();
 });
 
-// Removido: Sistema de tray
-// Removido: Deep links (mantidos apenas os básicos se necessário)
-// Removido: Lógica de minimização
+if (process.defaultApp) {
+	if (process.argv.length >= 2) {
+	  app.setAsDefaultProtocolClient('cardiopic-screen-recorder', process.execPath, [path.resolve(process.argv[1])])
+	}
+  } else {
+	app.setAsDefaultProtocolClient('cardiopic-screen-recorder')
+  }
+  
+  app.on('open-url', async (event, url) => {
+	event.preventDefault();  
+	try {
+	  const parsedUrl = new URL(url);
+	  const id = parsedUrl.searchParams.get('id');
+  
+	  if (id) {
+  
+		const response = await fetch(`https://www.cardiopic.com.br/cardiopic-report/Api/Laudos.php?id=${id}`, {
+			headers: {
+				'Content-Type': 'application/json',
+				'Accept': 'application/json',
+				'Authorization': 'Bearer ' + process.env.CARDIOPIC_API_KEY,
+			},
+		});
+		const data = await response.json() as ClientRequest;
+  
+  
+		mainWindow?.webContents.send('usuario-dados', data.data[0]);
+	  } else {
+		console.log('Parâmetro ID não encontrado na URL.');
+	  }
+  
+	} catch (error) {
+	  console.error('Erro ao processar a URL:', error);
+	}
+  });

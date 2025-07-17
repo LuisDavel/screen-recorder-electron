@@ -13,6 +13,7 @@ import { VideoHeaderComposer } from "./video-header-composer";
 import { VideoFooterComposer } from "./video-footer-composer";
 import { uploadToS3 } from "./s3-upload-helper";
 import { useS3ConfigStore } from "@/store/store-s3-config";
+import { CardiopicApiHelper } from "./cardiopic-api-helper";
 
 import type { HeaderConfig, FooterConfig } from "@/store/store-header-config";
 import { useHeaderConfigStore } from "@/store/store-header-config";
@@ -1358,6 +1359,48 @@ export class AdvancedScreenRecorderManager {
 							console.log("✅ Upload S3 concluído com sucesso!");
 							console.log("🔗 URL S3:", s3Result.s3Url);
 							console.log("🆔 Upload ID:", s3Result.uploadId);
+
+							// Enviar link do vídeo para API Cardiopic se há dados do paciente
+							if (s3Result.s3Url && CardiopicApiHelper.hasPatientData()) {
+								try {
+									console.log("📡 Enviando link do vídeo para API Cardiopic...");
+									const apiResult = await CardiopicApiHelper.sendVideoLink(s3Result.s3Url);
+									
+									if (apiResult.success) {
+										console.log("✅ Link do vídeo enviado com sucesso para API Cardiopic!");
+										
+										// Notificar usuário sobre sucesso do envio
+										if (typeof window !== "undefined" && "Notification" in window) {
+											new Notification("Link enviado para Cardiopic", {
+												body: "Link do vídeo enviado com sucesso para a API!",
+												icon: "/icon.png",
+											});
+										}
+									} else {
+										console.error("❌ Erro ao enviar link para API Cardiopic:", apiResult.message);
+										
+										// Notificar usuário sobre erro no envio
+										if (typeof window !== "undefined" && "Notification" in window) {
+											new Notification("Erro ao enviar link", {
+												body: `Erro: ${apiResult.message}`,
+												icon: "/icon.png",
+											});
+										}
+									}
+								} catch (apiError) {
+									console.error("❌ Erro inesperado ao enviar link para API Cardiopic:", apiError);
+									
+									// Notificar sobre erro inesperado
+									if (typeof window !== "undefined" && "Notification" in window) {
+										new Notification("Erro crítico ao enviar link", {
+											body: `Erro inesperado: ${apiError instanceof Error ? apiError.message : String(apiError)}`,
+											icon: "/icon.png",
+										});
+									}
+								}
+							} else if (!CardiopicApiHelper.hasPatientData()) {
+								console.log("ℹ️ Nenhum dado de paciente disponível - não enviando link para API Cardiopic");
+							}
 
 							// Notificar usuário sobre sucesso do upload
 							const uploadMessage = `Vídeo enviado para S3 com sucesso!`;

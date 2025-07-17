@@ -13,6 +13,7 @@ export interface HeaderConfig {
 	requestingDoctor: string;
 	crm: string;
 	externalId: string;
+	id: number;
 }
 
 export interface FooterConfig {
@@ -41,6 +42,7 @@ const defaultHeaderConfig: HeaderConfig = {
 	requestingDoctor: "Nome do médico",
 	crm: "12345/SP",
 	externalId: "Código/ID",
+	id: 0,
 };
 
 const defaultFooterConfig: FooterConfig = {

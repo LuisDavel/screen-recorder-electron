@@ -22,10 +22,17 @@ interface BackgroundRecordingAPI {
 	}>;
 }
 
-// Estender o window com backgroundRecordingAPI
+// Definir tipos para dados do deep link
+interface DeepLinkAPI {
+	onUserData: (callback: (data: unknown) => void) => void;
+	removeUserDataListener: (callback: (data: unknown) => void) => void;
+}
+
+// Estender o window com backgroundRecordingAPI e deepLinkAPI
 declare global {
 	interface Window {
 		backgroundRecordingAPI?: BackgroundRecordingAPI;
+		deepLinkAPI?: DeepLinkAPI;
 	}
 }
 
@@ -49,6 +56,19 @@ contextBridge.exposeInMainWorld("backgroundRecordingAPI", {
 	// Reforçar bloqueio de minimização
 	ensureMinimizationBlocked: () =>
 		ipcRenderer.invoke("ensure-minimization-blocked"),
+});
+
+// Expor API para dados do deep link
+contextBridge.exposeInMainWorld("deepLinkAPI", {
+	// Registrar listener para dados do usuário
+	onUserData: (callback: (data: unknown) => void) => {
+		ipcRenderer.on("usuario-dados", (_event: unknown, data: unknown) => callback(data));
+	},
+
+	// Remover listener para dados do usuário
+	removeUserDataListener: (callback: (data: unknown) => void) => {
+		ipcRenderer.removeListener("usuario-dados", callback);
+	},
 });
 
 // Escutar eventos de background mode do main process (legacy)

@@ -274,7 +274,6 @@ async function simpleUpload(
 
 	const result = await client.send(command);
 	const s3Url = `https://${s3Config.bucketName}.s3.${s3Config.region}.amazonaws.com/${key}`;
-
 	ProductionLogger.log("INFO", "Upload simples concluído", {
 		s3Url,
 		ETag: result.ETag,

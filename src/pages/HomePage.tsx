@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { Settings, AlertCircle } from "lucide-react";
+import { Settings, AlertCircle, UserCheck, FileText } from "lucide-react";
 import { ScreenPreview } from "@/components/ScreenPreview";
 import { RecordingControls } from "@/components/screen-recorder/RecordingControls";
 import { useSaveLocationStore } from "@/store/store-local-path-video";
@@ -16,6 +16,45 @@ import { FooterConfig } from "@/components/recording-header/FooterConfig";
 import { PermissionsManager } from "@/components/PermissionsManager";
 import { useDeviceInitialization } from "@/hooks/useDeviceInitialization";
 import { useDeviceNotifications } from "@/hooks/useDeviceNotifications";
+import { useHeaderConfigStore } from "@/store/store-header-config";
+import { usePatientDataStore } from "@/store/store-patient-data";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+// Tipo para os dados recebidos via deep link
+type DeepLinkData = {
+	id: number;
+	idExterno: null;
+	dataCadastro: string;
+	dataExame: string;
+	dataLaudo: string;
+	dataImagem: null;
+	dataEntrega: null;
+	codigoAtendimento: string;
+	exameCodigo: string;
+	terminologiaInterna: string;
+	abreviacao: null;
+	codPaciente: string;
+	pacienteNome: string;
+	pacienteIdade: number;
+	pacienteSexo: string;
+	dataNasc: string;
+	horasRestantes: string;
+	intituicaoNome: string;
+	instituicaoSigla: string;
+	requisitanteNome: string;
+	responsavelNome: string;
+	digitadoraNome: null;
+	idstatus: number;
+	status: string;
+	statusCor: string;
+	tipoatendimento: null;
+	prontuario: string;
+	achadoCritico: string;
+	fluxoCor: null;
+	fluxo: null;
+	idtipoexame: number;
+};
 
 export default function HomePage() {
 	const { saveLocation } = useSaveLocationStore();
@@ -23,6 +62,12 @@ export default function HomePage() {
 	const { isEnabled: cameraEnabled, mainStream } = useCameraConfigStore();
 	const { isEnabled: microphoneEnabled, mainStream: microphoneStream } =
 		useMicrophoneConfigStore();
+	const { updateHeaderConfig } = useHeaderConfigStore();
+	const { setPatientData } = usePatientDataStore();
+
+	// Estado para o dialog de confirmação
+	const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+	const [deepLinkData, setDeepLinkData] = useState<DeepLinkData | null>(null);
 
 	// Initialize permissions automatically when the app starts
 	const { initializePermissions, allPermissionsGranted } =
@@ -43,6 +88,68 @@ export default function HomePage() {
 	useDeviceNotifications({
 		devices: ["camera", "microphone"],
 	});
+
+	// Função para mapear dados do deep link para o formato do header
+	const mapDeepLinkToHeaderConfig = useCallback((data: DeepLinkData) => {
+		// Formatar data do exame
+		const examDate = new Date(data.dataExame).toLocaleDateString('pt-BR');
+		
+		// Formatar idade
+		const age = `${data.pacienteIdade} anos`;
+		
+		// Mapear sexo
+		const sex = data.pacienteSexo === 'M' ? 'Masculino' : 'Feminino';
+
+		return {
+			examName: data.terminologiaInterna || "Exame",
+			examDate: examDate,
+			patientName: data.pacienteNome,
+			patientSex: sex as "Masculino" | "Feminino",
+			patientAge: age,
+			institutionName: data.intituicaoNome,
+			requestingDoctor: data.requisitanteNome,
+			crm: "", // Não disponível nos dados recebidos
+			externalId: data.codigoAtendimento,
+		};
+	}, []);
+
+	// Função para aceitar e aplicar os dados
+	const handleAcceptData = useCallback(() => {
+		if (deepLinkData) {
+			// Armazenar dados do paciente no store
+			setPatientData(deepLinkData);
+			
+			// Mapear e atualizar dados do header
+			const headerData = mapDeepLinkToHeaderConfig(deepLinkData);
+			updateHeaderConfig(headerData);
+			
+			setShowConfirmDialog(false);
+			setDeepLinkData(null);
+		}
+	}, [deepLinkData, mapDeepLinkToHeaderConfig, updateHeaderConfig, setPatientData]);
+
+	// Função para rejeitar os dados
+	const handleRejectData = useCallback(() => {
+		setShowConfirmDialog(false);
+		setDeepLinkData(null);
+	}, []);
+
+	// Listener IPC para receber dados do deep link
+	useEffect(() => {
+		const handleDeepLinkData = (data: unknown) => {
+			console.log('📡 Dados recebidos via deep link:', data);
+			setDeepLinkData(data as DeepLinkData);
+			setShowConfirmDialog(true);
+		};
+
+		// Registrar o listener
+		window.deepLinkAPI?.onUserData(handleDeepLinkData);
+
+		// Cleanup
+		return () => {
+			window.deepLinkAPI?.removeUserDataListener(handleDeepLinkData);
+		};
+	}, []);
 
 	const handlePermissionsUpdated = useCallback(() => {
 		// Trigger a re-check if needed
@@ -71,6 +178,89 @@ export default function HomePage() {
 
 	return (
 		<div className="flex h-full flex-col gap-6 p-6">
+			{/* Dialog de confirmação para dados do deep link */}
+			<Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+				<DialogContent className="max-w-2xl">
+					<DialogHeader>
+						<DialogTitle className="flex items-center gap-2">
+							<UserCheck className="h-5 w-5" />
+							Dados do Paciente Recebidos
+						</DialogTitle>
+						<DialogDescription>
+							Recebemos dados de um exame via deep link. Deseja substituir as configurações atuais do cabeçalho?
+						</DialogDescription>
+					</DialogHeader>
+					
+					{deepLinkData && (
+						<div className="space-y-4">
+							<Card>
+								<CardHeader>
+									<CardTitle className="flex items-center gap-2 text-lg">
+										<FileText className="h-4 w-4" />
+										Dados do Exame
+									</CardTitle>
+								</CardHeader>
+								<CardContent className="space-y-3">
+									<div className="grid grid-cols-2 gap-4">
+										<div>
+											<label className="text-sm font-medium text-muted-foreground">
+												Exame
+											</label>
+											<p className="text-sm">{deepLinkData.terminologiaInterna}</p>
+										</div>
+										<div>
+											<label className="text-sm font-medium text-muted-foreground">
+												Data do Exame
+											</label>
+											<p className="text-sm">{new Date(deepLinkData.dataExame).toLocaleDateString('pt-BR')}</p>
+										</div>
+										<div>
+											<label className="text-sm font-medium text-muted-foreground">
+												Paciente
+											</label>
+											<p className="text-sm">{deepLinkData.pacienteNome}</p>
+										</div>
+										<div>
+											<label className="text-sm font-medium text-muted-foreground">
+												Idade / Sexo
+											</label>
+											<p className="text-sm">{deepLinkData.pacienteIdade} anos / {deepLinkData.pacienteSexo === 'M' ? 'Masculino' : 'Feminino'}</p>
+										</div>
+										<div>
+											<label className="text-sm font-medium text-muted-foreground">
+												Instituição
+											</label>
+											<p className="text-sm">{deepLinkData.intituicaoNome}</p>
+										</div>
+										<div>
+											<label className="text-sm font-medium text-muted-foreground">
+												Médico Solicitante
+											</label>
+											<p className="text-sm">{deepLinkData.requisitanteNome}</p>
+										</div>
+										<div className="col-span-2">
+											<label className="text-sm font-medium text-muted-foreground">
+												Código do Atendimento
+											</label>
+											<p className="text-sm">{deepLinkData.codigoAtendimento}</p>
+										</div>
+									</div>
+								</CardContent>
+							</Card>
+							
+							<div className="flex gap-2 justify-end">
+								<Button variant="outline" onClick={handleRejectData}>
+									Cancelar
+								</Button>
+								<Button onClick={handleAcceptData}>
+									Substituir Dados do Cabeçalho
+								</Button>
+							</div>
+						</div>
+					)}
+				</DialogContent>
+			</Dialog>
+
 			{!allPermissionsGranted ? (
 				<div className="w-full max-w-2xl mx-auto">
 					<PermissionsManager onPermissionsUpdated={handlePermissionsUpdated} />
