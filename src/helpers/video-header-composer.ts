@@ -270,16 +270,10 @@ export class VideoHeaderComposer {
 	}
 
 	private drawHeader() {
-		const headerHeight = this.headerConfig.height;
-
-		console.log("VideoHeaderComposer: Desenhando header", {
-			headerHeight,
-			canvasWidth: this.canvas.width,
-			examName: this.headerConfig.examName,
-		});
+		const headerHeight = this.headerConfig.height;	
 
 		// Draw header background at top
-		this.ctx.fillStyle = "rgba(17, 24, 39, 0.95)"; // gray-900 with opacity
+		this.ctx.fillStyle = "rgba(17, 24, 39)"; // gray-900 with opacity
 		this.ctx.fillRect(0, 0, this.canvas.width, headerHeight);
 
 		// Set text properties
@@ -342,14 +336,11 @@ export class VideoHeaderComposer {
 			padding,
 		);
 
-		// Draw second row if height allows
 		if (headerHeight > 60) {
 			y = (headerHeight * 2) / 3;
 
-			// Smaller font for second row
 			this.ctx.font = "11px system-ui, -apple-system, sans-serif";
 
-			// Institution
 			this.drawInlineInfo(
 				"Instituição:",
 				this.headerConfig.institutionName || "Não informada",
