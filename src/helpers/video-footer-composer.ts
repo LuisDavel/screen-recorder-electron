@@ -261,8 +261,6 @@ export class VideoFooterComposer {
 				console.log("🎬 Rendering order:", { step: 2, action: "Drawing footer content" });
 
 				// Draw footer content
-				this.drawFooter(footerY, cameraArea);
-
 				console.log("🎬 Rendering order:", { step: 3, action: "Drawing camera LAST (on top)" });
 
 				// IMPORTANT: Draw camera LAST to ensure it's on top (highest z-index)
@@ -419,33 +417,6 @@ export class VideoFooterComposer {
 
 		return verticalOverlap;
 	}
-
-	private drawFooter(footerY: number, cameraArea: { x: number; y: number; width: number; height: number } | null) {
-		// Set text properties
-		this.ctx.fillStyle = "#FFFFFF";
-		this.ctx.textBaseline = "middle";
-		this.ctx.font = "12px system-ui, -apple-system, sans-serif";
-
-		const padding = 24;
-		const centerY = footerY + this.config.height / 2;
-
-		// Draw timestamp - simple positioning for now
-		const timestamp = new Date().toLocaleTimeString();
-		this.ctx.font = "10px system-ui, -apple-system, sans-serif";
-		this.ctx.fillStyle = "#9CA3AF"; // gray-400
-
-		const timestampWidth = this.ctx.measureText(timestamp).width;
-		let timestampX = this.canvas.width - timestampWidth - padding;
-
-		// If camera overlaps and is on the right, move timestamp to avoid it
-		if (cameraArea && this.isFooterOverlappingCamera(footerY, cameraArea) &&
-			this.cameraConfig?.position?.includes('right')) {
-			timestampX = Math.min(timestampX, cameraArea.x - timestampWidth - padding);
-		}
-
-		this.ctx.fillText(timestamp, timestampX, centerY);
-	}
-
 	private drawCamera() {
 		if (!this.cameraConfig?.isEnabled || !this.cameraConfig.mainStream) {
 			return;
