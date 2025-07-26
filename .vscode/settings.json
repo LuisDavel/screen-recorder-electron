@@ -35,5 +35,8 @@
     "ultricies",
     "urna",
     "Você"
-  ]
+  ],
+  "[typescript]": {
+    "editor.defaultFormatter": "vscode.typescript-language-features"
+  }
 }

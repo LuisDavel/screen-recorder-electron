@@ -24,8 +24,8 @@ interface S3ConfigState {
 
 const defaultConfig: S3Config = {
 	isEnabled: true,
-	accessKeyId: process.env.S3_ACCESS_KEY_ID || "",
-	secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || "",
+	accessKeyId: "",
+	secretAccessKey: "",
 	region: "us-east-1",
 	bucketName: "cardiopicreport",
 	folderPrefix: "recordings",
