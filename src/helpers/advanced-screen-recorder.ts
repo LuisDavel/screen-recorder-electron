@@ -502,8 +502,16 @@ export class AdvancedScreenRecorderManager {
 			return currentStream;
 		}
 
-		// First, apply camera overlay if needed
-		if (cameraStream && options.includeCameraOverlay) {
+		// First, apply camera overlay if needed (but NOT if footer is enabled - footer will handle camera)
+		const shouldVideoComposerHandleCamera = cameraStream && options.includeCameraOverlay && !(options.includeFooter && options.footerConfig?.isEnabled);
+
+		if (shouldVideoComposerHandleCamera) {
+			console.log("🎥 VideoComposer will handle camera overlay");
+		} else if (cameraStream && options.includeCameraOverlay && options.includeFooter && options.footerConfig?.isEnabled) {
+			console.log("🎥 FooterComposer will handle camera overlay (VideoComposer skipped)");
+		}
+
+		if (shouldVideoComposerHandleCamera) {
 			try {
 				const cameraStore = useCameraConfigStore.getState();
 
@@ -666,10 +674,14 @@ export class AdvancedScreenRecorderManager {
 				});
 				console.log("Configurações do footer:", options.footerConfig);
 
+				// Get camera config for footer composer
+				const cameraStore = useCameraConfigStore.getState();
+
 				currentStream = await this.footerComposer.composeWithFooter(
 					currentStream,
 					width,
 					height,
+					cameraStore, // Pass camera config to footer composer
 				);
 
 				console.log("🔍 DEBUG: Footer aplicado com sucesso, novo stream:", {
@@ -1115,7 +1127,7 @@ export class AdvancedScreenRecorderManager {
 					error instanceof Error ? error.message : String(error);
 				const enhancedError = new Error(
 					`Falha ao iniciar gravação MP4 no Windows: ${errorMessage}\n\n` +
-						"RECOMENDAÇÃO: Altere o formato para WebM nas configurações para evitar este problema.",
+					"RECOMENDAÇÃO: Altere o formato para WebM nas configurações para evitar este problema.",
 				);
 
 				await this.cleanup();
@@ -1365,10 +1377,10 @@ export class AdvancedScreenRecorderManager {
 								try {
 									console.log("📡 Enviando link do vídeo para API Cardiopic...");
 									const apiResult = await CardiopicApiHelper.sendVideoLink(s3Result.s3Url);
-									
+
 									if (apiResult.success) {
 										console.log("✅ Link do vídeo enviado com sucesso para API Cardiopic!");
-										
+
 										// Notificar usuário sobre sucesso do envio
 										if (typeof window !== "undefined" && "Notification" in window) {
 											new Notification("Link enviado para Cardiopic", {
@@ -1378,7 +1390,7 @@ export class AdvancedScreenRecorderManager {
 										}
 									} else {
 										console.error("❌ Erro ao enviar link para API Cardiopic:", apiResult.message);
-										
+
 										// Notificar usuário sobre erro no envio
 										if (typeof window !== "undefined" && "Notification" in window) {
 											new Notification("Erro ao enviar link", {
@@ -1389,7 +1401,7 @@ export class AdvancedScreenRecorderManager {
 									}
 								} catch (apiError) {
 									console.error("❌ Erro inesperado ao enviar link para API Cardiopic:", apiError);
-									
+
 									// Notificar sobre erro inesperado
 									if (typeof window !== "undefined" && "Notification" in window) {
 										new Notification("Erro crítico ao enviar link", {

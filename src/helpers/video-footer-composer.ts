@@ -58,10 +58,18 @@ export class VideoFooterComposer {
 		// Store camera config
 		this.cameraConfig = cameraConfig || null;
 
+		console.log("🔍 DEBUG: Footer config check:", {
+			isEnabled: this.config.isEnabled,
+			height: this.config.height,
+			fullConfig: this.config
+		});
+
 		if (!this.config.isEnabled) {
-			console.log("Footer disabled, returning original stream");
+			console.log("❌ Footer disabled, returning original stream");
 			return inputStream;
 		}
+
+		console.log("✅ Footer enabled, proceeding with composition");
 
 		// Set canvas dimensions to match input (footer will overlay, not extend)
 		this.canvas.width = width;
@@ -185,7 +193,9 @@ export class VideoFooterComposer {
 				);
 
 				// Still draw camera even if footer is disabled
+				console.log("🎬 Footer disabled - drawing camera only");
 				this.drawCamera();
+
 			} else {
 				// Clear canvas
 				this.ctx.fillStyle = "#000000";
@@ -234,22 +244,31 @@ export class VideoFooterComposer {
 
 				// Draw footer overlay at the bottom (overlaying the video)
 				const footerY = this.canvas.height - this.config.height;
-				this.ctx.fillStyle = "rgba(17, 24, 39)"; // Same as header background
-				this.ctx.fillRect(0, footerY, this.canvas.width, this.config.height);
 
-				// Add subtle border at top of footer
-				this.ctx.strokeStyle = "rgba(107, 114, 128, 0.5)";
-				this.ctx.lineWidth = 1;
-				this.ctx.beginPath();
-				this.ctx.moveTo(0, footerY);
-				this.ctx.lineTo(this.canvas.width, footerY);
-				this.ctx.stroke();
+				// Get camera area to avoid overlap if needed
+				const cameraArea = this.getCameraArea();
 
-				// Draw footer content (placeholder for now)
-				this.drawFooter(footerY);
+				console.log("🎬 Rendering order:", {
+					step: 1,
+					action: "Drawing footer background",
+					footerY,
+					cameraArea: cameraArea ? `${cameraArea.x},${cameraArea.y} ${cameraArea.width}x${cameraArea.height}` : "none"
+				});
 
-				// Draw camera on top of footer if enabled
+				// Draw footer background, avoiding camera area if it overlaps
+				this.drawFooterBackground(footerY, cameraArea);
+
+				console.log("🎬 Rendering order:", { step: 2, action: "Drawing footer content" });
+
+				// Draw footer content
+				this.drawFooter(footerY, cameraArea);
+
+				console.log("🎬 Rendering order:", { step: 3, action: "Drawing camera LAST (on top)" });
+
+				// IMPORTANT: Draw camera LAST to ensure it's on top (highest z-index)
 				this.drawCamera();
+
+
 			}
 
 			this.animationFrameId = requestAnimationFrame(draw);
@@ -327,46 +346,21 @@ export class VideoFooterComposer {
 		console.log("✅ FooterComposer: Canvas ajustado com sucesso para:", `${this.canvas.width}x${this.canvas.height}`);
 	}
 
-	private drawFooter(footerY: number) {
-		// Set text properties
-		this.ctx.fillStyle = "#FFFFFF";
-		this.ctx.textBaseline = "middle";
-		this.ctx.font = "12px system-ui, -apple-system, sans-serif";
-
-		const padding = 24;
-		const centerY = footerY + this.config.height / 2;
-
-		// Optional: Add timestamp or other info
-		const timestamp = new Date().toLocaleTimeString();
-		this.ctx.font = "10px system-ui, -apple-system, sans-serif";
-		this.ctx.fillStyle = "#9CA3AF"; // gray-400
-
-		const timestampWidth = this.ctx.measureText(timestamp).width;
-		this.ctx.fillText(timestamp, this.canvas.width - timestampWidth - padding, centerY);
-	}
-
-	private drawCamera() {
+	private getCameraArea(): { x: number; y: number; width: number; height: number } | null {
 		if (!this.cameraConfig?.isEnabled || !this.cameraConfig.mainStream) {
-			return;
+			return null;
 		}
 
-		// Wait for camera video to be ready
-		if (this.cameraVideo.readyState < 2) {
-			console.log("🎥 Camera video not ready yet, readyState:", this.cameraVideo.readyState);
-			return;
-		}
-
-		// Calculate camera dimensions based on size setting
 		const baseSizes = {
-			small: { width: 120, height: 90 },
-			medium: { width: 160, height: 120 },
-			large: { width: 200, height: 150 }
+			small: { width: 400, height: 300 },   // was 120x90, now 233% bigger
+			medium: { width: 520, height: 390 },  // was 160x120, now 225% bigger
+			large: { width: 640, height: 480 }    // was 200x150, now 220% bigger
 		};
 
 		const cameraSize = baseSizes[this.cameraConfig.size] || baseSizes.medium;
 		const padding = 16;
 
-		// Calculate position based on position setting
+		// Calculate position based on CameraConfig position setting
 		let cameraX: number, cameraY: number;
 
 		switch (this.cameraConfig.position) {
@@ -389,11 +383,132 @@ export class VideoFooterComposer {
 				break;
 		}
 
-		console.log("🎥 Drawing camera at:", {
+		return {
+			x: cameraX - 3,
+			y: cameraY - 3,
+			width: cameraSize.width + 6,
+			height: cameraSize.height + 6
+		};
+	}
+
+	private drawFooterBackground(footerY: number, cameraArea: { x: number; y: number; width: number; height: number } | null) {
+		// Draw full footer background first
+		this.ctx.fillStyle = "rgba(17, 24, 39)"; // Same as header background
+		this.ctx.fillRect(0, footerY, this.canvas.width, this.config.height);
+
+		// Add subtle border at top of footer
+		this.ctx.strokeStyle = "rgba(107, 114, 128, 0.5)";
+		this.ctx.lineWidth = 1;
+		this.ctx.beginPath();
+		this.ctx.moveTo(0, footerY);
+		this.ctx.lineTo(this.canvas.width, footerY);
+		this.ctx.stroke();
+
+		// Note: Camera will be drawn AFTER this, so it will appear on top
+		if (cameraArea && this.isFooterOverlappingCamera(footerY, cameraArea)) {
+			console.log("🎥 Camera will be drawn over footer area");
+		}
+	}
+
+	private isFooterOverlappingCamera(footerY: number, cameraArea: { x: number; y: number; width: number; height: number }): boolean {
+		const footerBottom = footerY + this.config.height;
+		const cameraBottom = cameraArea.y + cameraArea.height;
+
+		// Check if there's vertical overlap
+		const verticalOverlap = !(footerBottom <= cameraArea.y || footerY >= cameraBottom);
+
+		return verticalOverlap;
+	}
+
+	private drawFooter(footerY: number, cameraArea: { x: number; y: number; width: number; height: number } | null) {
+		// Set text properties
+		this.ctx.fillStyle = "#FFFFFF";
+		this.ctx.textBaseline = "middle";
+		this.ctx.font = "12px system-ui, -apple-system, sans-serif";
+
+		const padding = 24;
+		const centerY = footerY + this.config.height / 2;
+
+		// Draw timestamp - simple positioning for now
+		const timestamp = new Date().toLocaleTimeString();
+		this.ctx.font = "10px system-ui, -apple-system, sans-serif";
+		this.ctx.fillStyle = "#9CA3AF"; // gray-400
+
+		const timestampWidth = this.ctx.measureText(timestamp).width;
+		let timestampX = this.canvas.width - timestampWidth - padding;
+
+		// If camera overlaps and is on the right, move timestamp to avoid it
+		if (cameraArea && this.isFooterOverlappingCamera(footerY, cameraArea) &&
+			this.cameraConfig?.position?.includes('right')) {
+			timestampX = Math.min(timestampX, cameraArea.x - timestampWidth - padding);
+		}
+
+		this.ctx.fillText(timestamp, timestampX, centerY);
+	}
+
+	private drawCamera() {
+		if (!this.cameraConfig?.isEnabled || !this.cameraConfig.mainStream) {
+			return;
+		}
+
+		// Wait for camera video to be ready
+		if (this.cameraVideo.readyState < 2) {
+			console.log("🎥 Camera video not ready yet, readyState:", this.cameraVideo.readyState);
+			return;
+		}
+
+		console.log("🎥 Drawing camera LAST (highest z-index)");
+		console.log("🔍 DEBUG: Camera config:", {
+			isEnabled: this.cameraConfig.isEnabled,
 			position: this.cameraConfig.position,
-			x: cameraX,
-			y: cameraY,
-			size: cameraSize,
+			size: this.cameraConfig.size,
+			hasMainStream: !!this.cameraConfig.mainStream,
+			videoReadyState: this.cameraVideo.readyState,
+			videoWidth: this.cameraVideo.videoWidth,
+			videoHeight: this.cameraVideo.videoHeight
+		});
+
+		// Calculate camera dimensions based on size setting (extra large sizes)
+		const baseSizes = {
+			small: { width: 400, height: 300 },   // was 120x90, now 233% bigger
+			medium: { width: 520, height: 390 },  // was 160x120, now 225% bigger
+			large: { width: 640, height: 480 }    // was 200x150, now 220% bigger
+		};
+
+		const cameraSize = baseSizes[this.cameraConfig.size] || baseSizes.medium;
+		const padding = 16;
+
+		// Calculate position based on position setting from CameraConfig
+		// Follow the exact position configured in the store
+		let cameraX: number, cameraY: number;
+
+		switch (this.cameraConfig.position) {
+			case "top-left":
+				cameraX = padding;
+				cameraY = padding;
+				break;
+			case "top-right":
+				cameraX = this.canvas.width - cameraSize.width - padding;
+				cameraY = padding;
+				break;
+			case "bottom-left":
+				cameraX = padding;
+				cameraY = this.canvas.height - cameraSize.height - padding;
+				break;
+			case "bottom-right":
+			default:
+				cameraX = this.canvas.width - cameraSize.width - padding;
+				cameraY = this.canvas.height - cameraSize.height - padding;
+				break;
+		}
+
+		console.log("🎥 Drawing camera following CameraConfig:", {
+			configuredPosition: this.cameraConfig.position,
+			configuredSize: this.cameraConfig.size,
+			calculatedPosition: { x: cameraX, y: cameraY },
+			cameraSize: cameraSize,
+			canvasSize: { width: this.canvas.width, height: this.canvas.height },
+			footerHeight: this.config.height,
 			videoReadyState: this.cameraVideo.readyState,
 			videoWidth: this.cameraVideo.videoWidth,
 			videoHeight: this.cameraVideo.videoHeight
@@ -402,9 +517,17 @@ export class VideoFooterComposer {
 		// Save context state
 		this.ctx.save();
 
-		// Draw camera background/border with more opacity to ensure visibility
-		this.ctx.fillStyle = "rgba(0, 0, 0, 0.9)";
-		this.ctx.fillRect(cameraX - 3, cameraY - 3, cameraSize.width + 6, cameraSize.height + 6);
+		// Draw camera background
+		const bgPadding = 4;
+
+		// Draw black background for the camera
+		this.ctx.fillStyle = "rgba(0, 0, 0, 1.0)";
+		this.ctx.fillRect(cameraX - bgPadding, cameraY - bgPadding, cameraSize.width + (bgPadding * 2), cameraSize.height + (bgPadding * 2));
+
+		// Add white border
+		this.ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+		this.ctx.lineWidth = 2;
+		this.ctx.strokeRect(cameraX - bgPadding, cameraY - bgPadding, cameraSize.width + (bgPadding * 2), cameraSize.height + (bgPadding * 2));
 
 		// Draw camera video with proper aspect ratio handling
 		const videoAspectRatio = this.cameraVideo.videoWidth / this.cameraVideo.videoHeight;
@@ -434,10 +557,21 @@ export class VideoFooterComposer {
 			cameraX, cameraY, cameraSize.width, cameraSize.height  // destination
 		);
 
-		// Draw border on top
-		this.ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
-		this.ctx.lineWidth = 2;
+		// Draw final border on top of camera video
+		this.ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+		this.ctx.lineWidth = 3;
 		this.ctx.strokeRect(cameraX, cameraY, cameraSize.width, cameraSize.height);
+
+		// Add small indicator to show camera is rendered
+		this.ctx.fillStyle = "rgba(0, 255, 0, 0.8)";
+		this.ctx.fillRect(cameraX + cameraSize.width - 10, cameraY, 10, 10);
+
+		console.log("✅ Camera drawn successfully following CameraConfig:", {
+			position: this.cameraConfig.position,
+			coordinates: { x: cameraX, y: cameraY },
+			size: { width: cameraSize.width, height: cameraSize.height },
+			renderedOnTop: true // Camera is always drawn last, so it's on top
+		});
 
 		// Restore context state
 		this.ctx.restore();
