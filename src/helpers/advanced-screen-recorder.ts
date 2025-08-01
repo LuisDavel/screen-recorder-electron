@@ -7,7 +7,7 @@ import {
 import { useCameraConfigStore } from "@/store/store-camera-config";
 import { useMicrophoneConfigStore } from "@/store/store-microphone-config";
 import { useVideoFormatStore } from "@/store/store-video-format";
-import { saveRecording, saveToLocation } from "./screen_recorder_helpers";
+import { saveRecording, saveToLocation, saveWithIntroVideo } from "./screen_recorder_helpers";
 import { recordingMonitor } from "./recording-monitor";
 import { VideoHeaderComposer } from "./video-header-composer";
 import { VideoFooterComposer } from "./video-footer-composer";
@@ -1312,21 +1312,57 @@ export class AdvancedScreenRecorderManager {
 				localEspecifico: this.options?.saveLocation,
 			});
 
+			// Verificar se deve incluir vídeo de introdução
+			const shouldIncludeIntro = this.options?.headerConfig?.includeIntroVideo &&
+				this.options?.headerConfig?.institutionName;
+
+			console.log("🔍 DEBUG - Verificação de introdução:", {
+				hasHeaderConfig: !!this.options?.headerConfig,
+				includeIntroVideo: this.options?.headerConfig?.includeIntroVideo,
+				institutionName: this.options?.headerConfig?.institutionName,
+				shouldIncludeIntro
+			});
+
 			if (this.options?.saveLocation) {
 				console.log(
 					"📁 Salvando em local específico:",
 					this.options.saveLocation,
 					"formato:",
 					format,
+					"com introdução:",
+					shouldIncludeIntro
 				);
-				result = await saveToLocation(
-					videoBuffer,
-					this.options.saveLocation,
-					format,
-				);
+
+				if (shouldIncludeIntro) {
+					console.log("🎬 Salvando com vídeo de introdução para:", this.options.headerConfig.institutionName);
+					result = await saveWithIntroVideo(
+						videoBuffer,
+						this.options.saveLocation,
+						this.options.headerConfig.institutionName,
+						format,
+					);
+				} else {
+					console.log("📁 Salvando sem vídeo de introdução");
+					console.log("🔍 Motivo:", {
+						includeIntroVideo: this.options?.headerConfig?.includeIntroVideo,
+						institutionName: this.options?.headerConfig?.institutionName,
+						headerEnabled: this.options?.headerConfig?.isEnabled
+					});
+					result = await saveToLocation(
+						videoBuffer,
+						this.options.saveLocation,
+						format,
+					);
+				}
 			} else {
 				console.log("📁 Salvando com seletor de arquivo, formato:", format);
+				// Para seletor de arquivo, usar método padrão (não suporta introdução ainda)
 				result = await saveRecording(videoBuffer, format);
+
+				// TODO: Implementar suporte a introdução para seletor de arquivo
+				if (shouldIncludeIntro) {
+					console.warn("⚠️ Vídeo de introdução não suportado com seletor de arquivo");
+				}
 			}
 
 			console.log("Resultado do salvamento:", result);

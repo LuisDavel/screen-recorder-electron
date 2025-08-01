@@ -1,5 +1,7 @@
 // Helpers para o Screen Recorder
 import { Buffer } from "buffer";
+import { concatenateWithIntro, generateIntroVideoFileName } from "./video-intro-renderer";
+import { joinPath } from "@/utils/path-utils";
 // Obter fontes de captura disponíveis
 export async function getScreenSources(): Promise<ScreenSource[]> {
 	return await window.screenRecorder.getSources();
@@ -85,6 +87,87 @@ export async function saveToLocation(
 		saveLocation,
 		format,
 	);
+}
+
+// Salvar vídeo com introdução
+export async function saveWithIntroVideo(
+	videoBuffer: Buffer,
+	saveLocation: string,
+	institutionName: string,
+	format?: string,
+): Promise<{
+	success: boolean;
+	message: string;
+	filePath?: string;
+	fileName?: string;
+}> {
+	try {
+		console.log("🎬 saveWithIntroVideo - Iniciando processo:", {
+			saveLocation,
+			institutionName,
+			format,
+			bufferSize: videoBuffer.length
+		});
+
+		// Primeiro salvar o vídeo gravado temporariamente
+		const tempResult = await saveToLocation(videoBuffer, saveLocation, format);
+		console.log("🎬 saveWithIntroVideo - Resultado temporário:", tempResult);
+
+		if (!tempResult.success || !tempResult.filePath) {
+			return tempResult;
+		}
+
+		// Gerar nome para o arquivo final com introdução
+		const finalFileName = generateIntroVideoFileName(institutionName, tempResult.fileName || "recording.mp4");
+		const finalFilePath = joinPath(saveLocation, finalFileName);
+
+		// Concatenar com vídeo de introdução
+		console.log("🎬 saveWithIntroVideo - Iniciando concatenação:", {
+			institutionName,
+			tempFilePath: tempResult.filePath,
+			finalFilePath
+		});
+
+		const concatResult = await concatenateWithIntro(
+			institutionName,
+			tempResult.filePath,
+			finalFilePath
+		);
+
+		console.log("🎬 saveWithIntroVideo - Resultado da concatenação:", concatResult);
+
+		if (concatResult.success) {
+			// Remover arquivo temporário após concatenação bem-sucedida
+			try {
+				console.log("🗑️ Removendo arquivo temporário:", tempResult.filePath);
+				const deleteResult = await window.electronAPI.invoke("fs:delete-file", tempResult.filePath);
+				console.log("🗑️ Resultado da remoção:", deleteResult);
+			} catch (error) {
+				console.warn("⚠️ Erro ao remover arquivo temporário:", error);
+				// Não falhar por causa disso, apenas avisar
+			}
+
+			return {
+				success: true,
+				message: "Vídeo salvo com introdução com sucesso",
+				filePath: finalFilePath,
+				fileName: finalFileName
+			};
+		} else {
+			return {
+				success: false,
+				message: `Erro ao adicionar introdução: ${concatResult.message}`,
+				filePath: tempResult.filePath, // Retornar arquivo original se falhar
+				fileName: tempResult.fileName
+			};
+		}
+	} catch (error) {
+		console.error("Erro ao salvar vídeo com introdução:", error);
+		return {
+			success: false,
+			message: `Erro ao processar vídeo: ${error instanceof Error ? error.message : String(error)}`
+		};
+	}
 }
 
 // Classe para gerenciar o MediaRecorder

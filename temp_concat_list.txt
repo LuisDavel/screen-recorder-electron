@@ -1,0 +1,2 @@
+file '/Volumes/ExtremeSSD/LDM System/CNR Tupiniquim/projetos/electron-video-recorder/assets/me.mp4'
+file '/Users/luisdavel/Documents/screen-recording-2025-08-01T02-22-23-686Z.webm'

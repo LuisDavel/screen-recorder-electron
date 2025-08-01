@@ -27,12 +27,33 @@ import {
 	DialogTitle,
 } from "../ui/dialog";
 import { Switch } from "../ui/switch";
+import {
+	hasIntroVideo as hasIntroVideoFn,
+	getAvailableInstitutions,
+} from "@/helpers/video-intro-renderer";
+import { Badge } from "../ui/badge";
 
 export function HeaderConfig() {
 	const { headerConfig, updateHeaderConfig } = useHeaderConfigStore();
 	const [isOpen, setIsOpen] = React.useState(false);
-	const handleInputChange = (field: string, value: string | number) => {
+	const [hasIntroVideo, setHasIntroVideo] = React.useState(false);
+	const [availableInstitutions, setAvailableInstitutions] = React.useState<
+		string[]
+	>([]);
+	const handleInputChange = (
+		field: string,
+		value: string | number | boolean,
+	) => {
+		console.log("🔍 HeaderConfig - Atualizando campo:", field, "valor:", value);
 		updateHeaderConfig({ [field]: value });
+
+		// Log adicional para debug
+		if (field === "institutionName") {
+			console.log("🏥 Instituição alterada para:", value);
+		}
+		if (field === "includeIntroVideo") {
+			console.log("🎬 Vídeo de introdução alterado para:", value);
+		}
 	};
 
 	const toggleHeader = () => {
@@ -43,6 +64,20 @@ export function HeaderConfig() {
 	const handleOpenChange = (open: boolean) => {
 		setIsOpen(open);
 	};
+
+	// Carregar instituições disponíveis ao montar o componente
+	React.useEffect(() => {
+		const institutions = getAvailableInstitutions();
+		setAvailableInstitutions(institutions);
+	}, []);
+
+	// Verificar se existe vídeo de introdução quando a instituição muda
+	React.useEffect(() => {
+		if (headerConfig.institutionName) {
+			const hasVideo = hasIntroVideoFn(headerConfig.institutionName);
+			setHasIntroVideo(hasVideo);
+		}
+	}, [headerConfig.institutionName]);
 
 	return (
 		<Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -210,14 +245,76 @@ export function HeaderConfig() {
 									<Building className="h-4 w-4" />
 									Nome da Instituição
 								</Label>
-								<Input
-									id="institution"
-									placeholder="Nome do hospital, clínica ou laboratório"
-									value={headerConfig.institutionName}
-									onChange={(e) =>
-										handleInputChange("institutionName", e.target.value)
+								<Select
+									value={headerConfig.institutionName || undefined}
+									onValueChange={(value) =>
+										handleInputChange("institutionName", value)
 									}
-								/>
+								>
+									<SelectTrigger id="institution">
+										<SelectValue placeholder="Selecione a instituição" />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="Hospital São Jose">
+											<div className="flex items-center justify-between w-full">
+												Hospital São Jose
+												{availableInstitutions.includes(
+													"Hospital São Jose",
+												) && (
+													<Badge variant="secondary" className="ml-2 text-xs">
+														Intro
+													</Badge>
+												)}
+											</div>
+										</SelectItem>
+										<SelectItem value="Samuel Cesconetto">
+											<div className="flex items-center justify-between w-full">
+												Samuel Cesconetto
+												{availableInstitutions.includes(
+													"Samuel Cesconetto",
+												) && (
+													<Badge variant="secondary" className="ml-2 text-xs">
+														Intro
+													</Badge>
+												)}
+											</div>
+										</SelectItem>
+										<SelectItem value="Unimed">
+											<div className="flex items-center justify-between w-full">
+												Unimed
+												{availableInstitutions.includes("Unimed") && (
+													<Badge variant="secondary" className="ml-2 text-xs">
+														Intro
+													</Badge>
+												)}
+											</div>
+										</SelectItem>
+										<SelectItem value="Hospital São João Batista">
+											<div className="flex items-center justify-between w-full">
+												Hospital São João Batista
+												{availableInstitutions.includes(
+													"Hospital São João Batista",
+												) && (
+													<Badge variant="secondary" className="ml-2 text-xs">
+														Intro
+													</Badge>
+												)}
+											</div>
+										</SelectItem>
+										<SelectItem value="Hospital São Donato">
+											<div className="flex items-center justify-between w-full">
+												Hospital São Donato
+												{availableInstitutions.includes(
+													"Hospital São Donato",
+												) && (
+													<Badge variant="secondary" className="ml-2 text-xs">
+														Intro
+													</Badge>
+												)}
+											</div>
+										</SelectItem>
+									</SelectContent>
+								</Select>
 							</div>
 						</div>
 
@@ -271,6 +368,102 @@ export function HeaderConfig() {
 									handleInputChange("externalId", e.target.value)
 								}
 							/>
+						</div>
+
+						{/* Vídeo de Introdução */}
+						<div className="mb-6 space-y-4">
+							<div className="flex items-center justify-between">
+								<div>
+									<Label className="flex items-center gap-2 mb-2">
+										<FileText className="h-4 w-4" />
+										Vídeo de Introdução
+									</Label>
+									<p className="text-sm text-muted-foreground">
+										{hasIntroVideo
+											? `Vídeo de introdução disponível para ${headerConfig.institutionName}`
+											: headerConfig.institutionName
+												? `Nenhum vídeo de introdução encontrado para ${headerConfig.institutionName}`
+												: "Selecione uma instituição para verificar disponibilidade"}
+									</p>
+								</div>
+								<div className="flex items-center gap-2">
+									<Switch
+										checked={headerConfig.includeIntroVideo && hasIntroVideo}
+										onCheckedChange={(checked) => {
+											// Só permitir ativar se há vídeo disponível
+											if (checked && !hasIntroVideo) {
+												return;
+											}
+											handleInputChange("includeIntroVideo", checked);
+										}}
+										disabled={!hasIntroVideo}
+									/>
+									<Button
+										size="sm"
+										variant="outline"
+										onClick={() => {
+											console.log("🔍 DEBUG - Estado atual:", {
+												institutionName: headerConfig.institutionName,
+												includeIntroVideo: headerConfig.includeIntroVideo,
+												hasIntroVideo,
+												availableInstitutions,
+												headerConfigCompleto: headerConfig,
+											});
+										}}
+									>
+										Debug
+									</Button>
+									<Button
+										size="sm"
+										variant="outline"
+										onClick={async () => {
+											try {
+												console.log("🧪 Testando concatenação...");
+
+												// Primeiro testar se o FFmpeg está funcionando
+												const ffmpegTest = await window.electronAPI.invoke(
+													"ffmpeg:check-availability",
+												);
+												console.log("🧪 Status do FFmpeg:", ffmpegTest);
+
+												if (!ffmpegTest.isAvailable) {
+													alert(
+														"FFmpeg não está disponível: " + ffmpegTest.error,
+													);
+													return;
+												}
+
+												// Verificar se os vídeos de introdução existem
+												const introCheck = await window.electronAPI.invoke(
+													"video-intro:check-intro",
+													headerConfig.institutionName,
+												);
+												console.log(
+													"🧪 Verificação de introdução:",
+													introCheck,
+												);
+
+												if (!introCheck.hasIntro) {
+													alert(
+														"Vídeo de introdução não encontrado para " +
+															headerConfig.institutionName,
+													);
+													return;
+												}
+
+												alert(
+													"✅ FFmpeg funcionando e vídeo de introdução disponível!\n\nVerifique o console para logs detalhados.",
+												);
+											} catch (error) {
+												console.error("🧪 Erro no teste:", error);
+												alert("Erro: " + error);
+											}
+										}}
+									>
+										Test Sistema
+									</Button>
+								</div>
+							</div>
 						</div>
 					</div>
 				</div>

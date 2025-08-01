@@ -7,6 +7,9 @@ import { addPermissionsEventListeners } from "./permissions/permissions-listener
 import { registerProductionLogsListeners } from "./production-logs/production-logs-listeners";
 import { registerDiagnosticListeners } from "./diagnostic/diagnostic-listeners";
 import { addS3UploadEventListeners } from "./s3-upload/s3-upload-listeners";
+import { addVideoIntroEventListeners } from "./video-intro/video-intro-listeners";
+import { addFFmpegEventListeners } from "./ffmpeg/ffmpeg-listeners";
+import { addFileSystemEventListeners } from "./file-system/file-system-listeners";
 
 // Debug log da importação
 console.log(
@@ -36,6 +39,15 @@ const CHANNELS_TO_REGISTER = [
 	"diagnostic:auto-fix-permissions",
 	"s3-upload:upload-file",
 	"s3-upload:test-connection",
+	"video-intro:concatenate",
+	"video-intro:get-available",
+	"video-intro:check-intro",
+	"ffmpeg:check-availability",
+	"ffmpeg:get-install-suggestion",
+	"ffmpeg:auto-install",
+	"fs:delete-file",
+	"fs:exists",
+	"fs:move-file",
 ];
 
 // Função para limpar handlers existentes
@@ -86,6 +98,18 @@ export default function registerListeners(mainWindow: BrowserWindow) {
 			console.error("❌ Erro ao chamar função S3:", error);
 			throw error;
 		}
+
+		// Registrar listeners de vídeo intro
+		addVideoIntroEventListeners(mainWindow);
+		console.log("✅ Listeners de vídeo intro registrados");
+
+		// Registrar listeners do FFmpeg
+		addFFmpegEventListeners(mainWindow);
+		console.log("✅ Listeners do FFmpeg registrados");
+
+		// Registrar listeners do sistema de arquivos
+		addFileSystemEventListeners(mainWindow);
+		console.log("✅ Listeners do sistema de arquivos registrados");
 
 		// Registrar logs e diagnósticos apenas em desenvolvimento
 		if (process.env.NODE_ENV === "development") {

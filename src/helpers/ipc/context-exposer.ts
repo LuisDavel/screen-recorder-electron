@@ -6,6 +6,7 @@ import { exposePermissionsContext } from "./permissions/permissions-context";
 import { exposeProductionLogsContext } from "./production-logs/production-logs-context";
 import { exposeDiagnosticContext } from "./diagnostic/diagnostic-context";
 import { exposeS3UploadContext } from "./s3-upload/s3-upload-context";
+import { exposeElectronAPIContext } from "./electron-api/electron-api-context";
 
 // Controle para evitar exposição duplicada
 let contextsExposed = false;
@@ -18,6 +19,7 @@ export default function exposeContexts() {
 	}
 
 	try {
+		exposeElectronAPIContext(); // Expor primeiro para que outros contextos possam usar
 		exposeWindowContext();
 		exposeThemeContext();
 		exposePlatformContext();

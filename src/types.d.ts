@@ -137,6 +137,11 @@ declare interface Window {
 	productionLogs: ProductionLogsContext;
 	diagnostic: DiagnosticContext;
 	s3Upload: S3UploadContext;
+	electronAPI: {
+		invoke(channel: string, ...args: any[]): Promise<any>;
+		on(channel: string, callback: (...args: any[]) => void): void;
+		removeAllListeners(channel: string): void;
+	};
 }
 
 // Adicionar o tipo PlatformType

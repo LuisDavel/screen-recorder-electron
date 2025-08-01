@@ -1,9 +1,56 @@
 import exposeContexts from "./helpers/ipc/context-exposer";
 
+// Expor contextos
 exposeContexts();
+
+// Verificar se electronAPI foi exposta corretamente
+setTimeout(() => {
+	if (typeof window !== 'undefined' && (window as any).electronAPI) {
+		console.log("✅ electronAPI verificada no preload:", typeof (window as any).electronAPI);
+
+		// Expor função de teste global
+		(window as any).testElectronAPI = async () => {
+			try {
+				console.log("🧪 Testando electronAPI...");
+				const result = await (window as any).electronAPI.invoke("platform:get");
+				console.log("🧪 Teste bem-sucedido:", result);
+				return true;
+			} catch (error) {
+				console.error("🧪 Teste falhou:", error);
+				return false;
+			}
+		};
+	} else {
+		console.error("❌ electronAPI não está disponível no preload");
+	}
+}, 200);
 
 // Setup background recording listeners
 const { ipcRenderer, contextBridge } = window.require("electron");
+
+// Fallback: Expor electronAPI diretamente se não foi exposta pelos contextos
+try {
+	if (!(window as any).electronAPI) {
+		console.log("🔧 Expondo electronAPI como fallback...");
+		contextBridge.exposeInMainWorld("electronAPI", {
+			invoke: (channel: string, ...args: any[]) => {
+				console.log("🔍 electronAPI.invoke (fallback):", { channel, args });
+				return ipcRenderer.invoke(channel, ...args);
+			},
+			on: (channel: string, callback: (...args: any[]) => void) => {
+				console.log("🔍 electronAPI.on (fallback):", { channel });
+				return ipcRenderer.on(channel, callback);
+			},
+			removeAllListeners: (channel: string) => {
+				console.log("🔍 electronAPI.removeAllListeners (fallback):", { channel });
+				return ipcRenderer.removeAllListeners(channel);
+			}
+		});
+		console.log("✅ electronAPI fallback exposta com sucesso");
+	}
+} catch (error) {
+	console.error("❌ Erro ao expor electronAPI fallback:", error);
+}
 
 // Definir tipos para a API de background recording
 interface BackgroundRecordingAPI {

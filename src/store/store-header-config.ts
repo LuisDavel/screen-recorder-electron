@@ -14,6 +14,8 @@ export interface HeaderConfig {
 	crm: string;
 	externalId: string;
 	id: number;
+	// Configurações de vídeo de introdução
+	includeIntroVideo: boolean;
 }
 
 export interface FooterConfig {
@@ -38,11 +40,12 @@ const defaultHeaderConfig: HeaderConfig = {
 	patientName: "Nome completo do paciente",
 	patientSex: "Masculino" as const,
 	patientAge: "35 anos",
-	institutionName: "Nome do hospital, clínica ou laboratório",
+	institutionName: "Hospital São Jose",
 	requestingDoctor: "Nome do médico",
 	crm: "12345/SP",
 	externalId: "Código/ID",
 	id: 0,
+	includeIntroVideo: true,
 };
 
 const defaultFooterConfig: FooterConfig = {
