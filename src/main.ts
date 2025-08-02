@@ -2,6 +2,7 @@ import { app, BrowserWindow, powerSaveBlocker, ipcMain } from "electron";
 import registerListeners from "./helpers/ipc/listeners-register";
 import { PermissionsHelper } from "./helpers/permissions-helper";
 import { ProductionLogger } from "./helpers/production-logger";
+import { GlobalShortcuts } from "./helpers/global-shortcuts";
 
 import path from "path";
 import {
@@ -118,6 +119,9 @@ function createWindow() {
 		mainWindow?.show();
 		mainWindow?.focus();
 
+		// Inicializar atalhos globais
+		GlobalShortcuts.getInstance().initialize(mainWindow);
+
 		// Iniciar modo translúcido após 3 segundos
 		startTranslucencyTimer();
 
@@ -202,6 +206,7 @@ function createWindow() {
 		console.log("Janela principal foi fechada");
 		cleanupPowerSaveBlockers();
 		clearTranslucencyTimer();
+		GlobalShortcuts.getInstance().dispose();
 		mainWindow = null;
 	});
 
@@ -331,6 +336,12 @@ function setupBackgroundRecordingHandlers() {
 	ipcMain.handle("ensure-minimization-blocked", async () => {
 		ensureMinimizationBlocked();
 		return { success: true, blocked: true };
+	});
+
+	// Obter atalhos registrados
+	ipcMain.handle("get-global-shortcuts", async () => {
+		const shortcuts = GlobalShortcuts.getInstance().getRegisteredShortcuts();
+		return { success: true, shortcuts };
 	});
 
 	console.log("📡 IPC handlers para background recording configurados");
@@ -466,41 +477,42 @@ app.on("before-quit", () => {
 	console.log("🔄 App sendo fechado - limpando recursos");
 	cleanupPowerSaveBlockers();
 	clearTranslucencyTimer();
+	GlobalShortcuts.getInstance().dispose();
 	ProductionLogger.logAppQuit();
 });
 
 if (process.defaultApp) {
 	if (process.argv.length >= 2) {
-	  app.setAsDefaultProtocolClient('cardiopic-screen-recorder', process.execPath, [path.resolve(process.argv[1])])
+		app.setAsDefaultProtocolClient('cardiopic-screen-recorder', process.execPath, [path.resolve(process.argv[1])])
 	}
-  } else {
+} else {
 	app.setAsDefaultProtocolClient('cardiopic-screen-recorder')
-  }
-  
-  app.on('open-url', async (event, url) => {
-	event.preventDefault();  
+}
+
+app.on('open-url', async (event, url) => {
+	event.preventDefault();
 	try {
-	  const parsedUrl = new URL(url);
-	  const id = parsedUrl.searchParams.get('id');
-  
-	  if (id) {
-  
-		const response = await fetch(`https://www.cardiopic.com.br/cardiopic-report/Api/Laudos.php?id=${id}`, {
-			headers: {
-				'Content-Type': 'application/json',
-				'Accept': 'application/json',
-				'Authorization': 'Bearer ' + process.env.CARDIOPIC_API_KEY,
-			},
-		});
-		const data = await response.json() as ClientRequest;
-  
-  
-		mainWindow?.webContents.send('usuario-dados', data.data[0]);
-	  } else {
-		console.log('Parâmetro ID não encontrado na URL.');
-	  }
-  
+		const parsedUrl = new URL(url);
+		const id = parsedUrl.searchParams.get('id');
+
+		if (id) {
+
+			const response = await fetch(`https://www.cardiopic.com.br/cardiopic-report/Api/Laudos.php?id=${id}`, {
+				headers: {
+					'Content-Type': 'application/json',
+					'Accept': 'application/json',
+					'Authorization': 'Bearer ' + process.env.CARDIOPIC_API_KEY,
+				},
+			});
+			const data = await response.json() as ClientRequest;
+
+
+			mainWindow?.webContents.send('usuario-dados', data.data[0]);
+		} else {
+			console.log('Parâmetro ID não encontrado na URL.');
+		}
+
 	} catch (error) {
-	  console.error('Erro ao processar a URL:', error);
+		console.error('Erro ao processar a URL:', error);
 	}
-  });
+});

@@ -162,6 +162,22 @@ ipcRenderer.on(
 	},
 );
 
+// Escutar eventos de atalhos globais
+ipcRenderer.on("shortcut:start-recording", () => {
+	console.log("🎹 Atalho start-recording recebido no preload");
+	window.dispatchEvent(new CustomEvent("shortcut:start-recording"));
+});
+
+ipcRenderer.on("shortcut:stop-recording", () => {
+	console.log("🎹 Atalho stop-recording recebido no preload");
+	window.dispatchEvent(new CustomEvent("shortcut:stop-recording"));
+});
+
+ipcRenderer.on("shortcut:toggle-pause", () => {
+	console.log("🎹 Atalho toggle-pause recebido no preload");
+	window.dispatchEvent(new CustomEvent("shortcut:toggle-pause"));
+});
+
 // Sistema de keep alive para manter aplicação ativa
 let keepAliveInterval: NodeJS.Timeout | null = null;
 

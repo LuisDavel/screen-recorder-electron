@@ -38,7 +38,7 @@ export default function SecondPage() {
 				</div>
 
 				<div className="grid w-full grid-cols-1 gap-6 md:grid-cols-2">
-					<FFmpegStatus />
+					{/* <FFmpegStatus /> */}
 					{/* <VideoIntroTest /> */}
 				</div>
 

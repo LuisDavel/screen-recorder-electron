@@ -19,6 +19,7 @@ import {
 	Video,
 } from "lucide-react";
 import { useBackgroundRecording } from "@/hooks/useBackgroundRecording";
+import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
 
 interface RecordingControlsProps {
 	selectedSourceId: { id: string; name: string; thumbnail: string } | null;
@@ -48,9 +49,41 @@ export function RecordingControls({
 	const { headerConfig, footerConfig } = useHeaderConfigStore();
 	const { showSuccess, showError, showInfo } = useToastHelpers();
 	const { syncRecordingStatus } = useBackgroundRecording();
+	const { shortcuts, registerShortcutHandlers } = useGlobalShortcuts();
 
 	// Verificar se é modo câmera apenas
 	const isCameraOnlyMode = selectedSourceId?.id === "camera-only";
+
+	// Registrar handlers para atalhos globais
+	useEffect(() => {
+		const cleanup = registerShortcutHandlers({
+			onStartRecording: () => {
+				if (!isRecording && !isLoading) {
+					console.log("🎹 Iniciando gravação via atalho");
+					handleStartRecording();
+				}
+			},
+			onStopRecording: () => {
+				if (isRecording && !isLoading) {
+					console.log("🎹 Parando gravação via atalho");
+					handleStopRecording();
+				}
+			},
+			onTogglePause: () => {
+				if (isRecording && !isLoading) {
+					if (isPaused) {
+						console.log("🎹 Retomando gravação via atalho");
+						handleResumeRecording();
+					} else {
+						console.log("🎹 Pausando gravação via atalho");
+						handlePauseRecording();
+					}
+				}
+			},
+		});
+
+		return cleanup;
+	}, [isRecording, isPaused, isLoading]);
 
 	// Timer para mostrar o tempo de gravação
 	useEffect(() => {
