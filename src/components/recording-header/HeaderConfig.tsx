@@ -371,98 +371,25 @@ export function HeaderConfig() {
 						</div>
 
 						{/* Vídeo de Introdução */}
-						<div className="mb-6 space-y-4">
-							<div className="flex items-center justify-between">
-								<div>
-									<Label className="flex items-center gap-2 mb-2">
-										<FileText className="h-4 w-4" />
-										Vídeo de Introdução
-									</Label>
-									<p className="text-sm text-muted-foreground">
-										{hasIntroVideo
-											? `Vídeo de introdução disponível para ${headerConfig.institutionName}`
-											: headerConfig.institutionName
-												? `Nenhum vídeo de introdução encontrado para ${headerConfig.institutionName}`
-												: "Selecione uma instituição para verificar disponibilidade"}
-									</p>
-								</div>
-								<div className="flex items-center gap-2">
-									<Switch
-										checked={headerConfig.includeIntroVideo && hasIntroVideo}
-										onCheckedChange={(checked) => {
-											// Só permitir ativar se há vídeo disponível
-											if (checked && !hasIntroVideo) {
-												return;
-											}
-											handleInputChange("includeIntroVideo", checked);
-										}}
-										disabled={!hasIntroVideo}
-									/>
-									<Button
-										size="sm"
-										variant="outline"
-										onClick={() => {
-											console.log("🔍 DEBUG - Estado atual:", {
-												institutionName: headerConfig.institutionName,
-												includeIntroVideo: headerConfig.includeIntroVideo,
-												hasIntroVideo,
-												availableInstitutions,
-												headerConfigCompleto: headerConfig,
-											});
-										}}
-									>
-										Debug
-									</Button>
-									<Button
-										size="sm"
-										variant="outline"
-										onClick={async () => {
-											try {
-												console.log("🧪 Testando concatenação...");
-
-												// Primeiro testar se o FFmpeg está funcionando
-												const ffmpegTest = await window.electronAPI.invoke(
-													"ffmpeg:check-availability",
-												);
-												console.log("🧪 Status do FFmpeg:", ffmpegTest);
-
-												if (!ffmpegTest.isAvailable) {
-													alert(
-														"FFmpeg não está disponível: " + ffmpegTest.error,
-													);
-													return;
-												}
-
-												// Verificar se os vídeos de introdução existem
-												const introCheck = await window.electronAPI.invoke(
-													"video-intro:check-intro",
-													headerConfig.institutionName,
-												);
-												console.log(
-													"🧪 Verificação de introdução:",
-													introCheck,
-												);
-
-												if (!introCheck.hasIntro) {
-													alert(
-														"Vídeo de introdução não encontrado para " +
-															headerConfig.institutionName,
-													);
-													return;
-												}
-
-												alert(
-													"✅ FFmpeg funcionando e vídeo de introdução disponível!\n\nVerifique o console para logs detalhados.",
-												);
-											} catch (error) {
-												console.error("🧪 Erro no teste:", error);
-												alert("Erro: " + error);
-											}
-										}}
-									>
-										Test Sistema
-									</Button>
-								</div>
+						<div className="flex items-center border p-4 rounder-md mb-4 mt-4 justify-between">
+							<div>
+								<Label className="flex items-center gap-2 mb-2">
+									<FileText className="h-4 w-4" />
+									Vídeo de Introdução
+								</Label>
+							</div>
+							<div className="flex items-center gap-2">
+								<Switch
+									checked={headerConfig.includeIntroVideo && hasIntroVideo}
+									onCheckedChange={(checked) => {
+										// Só permitir ativar se há vídeo disponível
+										if (checked && !hasIntroVideo) {
+											return;
+										}
+										handleInputChange("includeIntroVideo", checked);
+									}}
+									disabled={!hasIntroVideo}
+								/>
 							</div>
 						</div>
 					</div>

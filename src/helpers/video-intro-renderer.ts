@@ -1,5 +1,4 @@
 // Sistema de vídeos de introdução para o renderer process
-// Usa apenas IPC para comunicação com o main process
 
 export interface IntroVideoInfo {
     hasIntro: boolean;
@@ -20,19 +19,19 @@ export interface ConcatenateResult {
     outputPath?: string;
 }
 
-// Mapeamento local para verificação rápida (sem usar IPC)
+// Mapeamento de hospitais para arquivos de vídeo
 const HOSPITAL_INTRO_MAPPING = {
     "Hospital São Jose": "hsj.mp4",
     "Samuel Cesconetto": "me.mp4",
     "Unimed": "unimed.mp4",
-    "Hospital São João Batista": "hsj.mp4",
+    "Hospital São João Batista": "hsjb.mp4",
     "Hospital São Donato": "hsd.mp4",
 } as const;
 
 export type HospitalName = keyof typeof HOSPITAL_INTRO_MAPPING;
 
 /**
- * Verifica se existe vídeo de introdução para uma instituição (verificação local)
+ * Verifica se existe vídeo de introdução para uma instituição
  */
 export function hasIntroVideo(institutionName: string): boolean {
     const hasVideo = institutionName in HOSPITAL_INTRO_MAPPING;
@@ -41,7 +40,7 @@ export function hasIntroVideo(institutionName: string): boolean {
 }
 
 /**
- * Obtém lista de instituições que possuem vídeos de introdução (verificação local)
+ * Obtém lista de instituições que possuem vídeos de introdução
  */
 export function getAvailableInstitutions(): HospitalName[] {
     return Object.keys(HOSPITAL_INTRO_MAPPING) as HospitalName[];
@@ -78,8 +77,7 @@ export function generateIntroVideoFileName(
 }
 
 /**
- * Concatena vídeo de introdução com vídeo gravado (via IPC)
- * Esta função será implementada quando o IPC estiver funcionando
+ * Concatena vídeo de introdução com vídeo gravado via IPC
  */
 export async function concatenateWithIntro(
     institutionName: string,

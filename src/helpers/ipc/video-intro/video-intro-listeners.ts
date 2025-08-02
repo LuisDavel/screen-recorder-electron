@@ -1,5 +1,5 @@
 import { ipcMain, BrowserWindow } from "electron";
-import { existsSync, statSync, writeFileSync, unlinkSync } from "fs";
+import { existsSync, statSync } from "fs";
 import { join } from "path";
 import { execFile } from "child_process";
 import { promisify } from "util";
@@ -24,38 +24,27 @@ async function testFFmpegPath(path: string): Promise<boolean> {
 
 // Função para encontrar FFmpeg do sistema
 async function findSystemFFmpeg(): Promise<string | null> {
-    console.log("🔍 DEBUG: Iniciando findSystemFFmpeg");
-
     const systemPaths = [
         "/opt/homebrew/bin/ffmpeg", // Homebrew Apple Silicon
         "/usr/local/bin/ffmpeg",    // Homebrew Intel
         "ffmpeg"                    // PATH
     ];
 
-    console.log("🔍 DEBUG: Caminhos a testar:", systemPaths);
-
     for (const path of systemPaths) {
-        console.log(`🔍 DEBUG: Testando caminho: ${path}`);
         const works = await testFFmpegPath(path);
-        console.log(`🔍 DEBUG: Resultado do teste para ${path}:`, works);
-
         if (works) {
-            console.log(`✅ DEBUG: FFmpeg encontrado e funcionando: ${path}`);
             return path;
-        } else {
-            console.log(`❌ DEBUG: Caminho não funciona: ${path}`);
         }
     }
 
-    console.log("❌ DEBUG: Nenhum caminho funcionou, retornando null");
     return null;
 }
 
-export function addVideoIntroEventListeners(mainWindow: BrowserWindow) {
+export function addVideoIntroEventListeners(_mainWindow: BrowserWindow) {
     // Verificar se existe vídeo de introdução para uma instituição
     ipcMain.handle(
         VIDEO_INTRO_CHECK_INTRO_CHANNEL,
-        async (event, institutionName: string) => {
+        async (_event, institutionName: string) => {
             try {
                 const introPath = VideoIntroManager.getIntroVideoPath(institutionName);
 
@@ -73,7 +62,7 @@ export function addVideoIntroEventListeners(mainWindow: BrowserWindow) {
                 };
             } catch (error) {
                 console.error("Erro ao verificar vídeo de introdução:", error);
-                return { hasIntro: false, path: null, error: error.message };
+                return { hasIntro: false, path: null, error: (error as Error).message };
             }
         }
     );
@@ -106,7 +95,7 @@ export function addVideoIntroEventListeners(mainWindow: BrowserWindow) {
             console.error("Erro ao obter instituições disponíveis:", error);
             return {
                 success: false,
-                error: error.message,
+                error: (error as Error).message,
                 institutions: []
             };
         }
@@ -116,7 +105,7 @@ export function addVideoIntroEventListeners(mainWindow: BrowserWindow) {
     ipcMain.handle(
         VIDEO_INTRO_CONCATENATE_CHANNEL,
         async (
-            event,
+            _event,
             {
                 institutionName,
                 recordedVideoPath,
@@ -185,33 +174,12 @@ export function addVideoIntroEventListeners(mainWindow: BrowserWindow) {
                 }
 
                 // Encontrar FFmpeg do sistema
-                console.log("🎬 DEBUG: Procurando FFmpeg do sistema...");
-                console.log("🎬 DEBUG: Função findSystemFFmpeg existe:", typeof findSystemFFmpeg);
-
                 const ffmpegPath = await findSystemFFmpeg();
-                console.log("🎬 DEBUG: Resultado de findSystemFFmpeg:", ffmpegPath);
 
                 if (!ffmpegPath) {
-                    console.error("❌ FFmpeg não encontrado em nenhum caminho do sistema");
                     return {
                         success: false,
                         message: "FFmpeg não encontrado. Instale com: brew install ffmpeg",
-                    };
-                }
-
-                console.log("🎬 DEBUG: Usando FFmpeg final:", ffmpegPath);
-                console.log("🎬 DEBUG: Tipo do ffmpegPath:", typeof ffmpegPath);
-
-                // FORÇAR uso do FFmpeg do sistema (debug)
-                const forcedFFmpegPath = "/opt/homebrew/bin/ffmpeg";
-                console.log("🎬 DEBUG: FORÇANDO uso do FFmpeg:", forcedFFmpegPath);
-
-                // Verificar se o caminho forçado existe
-                if (!existsSync(forcedFFmpegPath)) {
-                    console.error("❌ DEBUG: Caminho forçado não existe:", forcedFFmpegPath);
-                    return {
-                        success: false,
-                        message: "FFmpeg não encontrado no caminho esperado: " + forcedFFmpegPath,
                     };
                 }
 
@@ -237,75 +205,48 @@ export function addVideoIntroEventListeners(mainWindow: BrowserWindow) {
                     outputPath                     // Arquivo de saída
                 ];
 
-                console.log("🎬 Executando FFmpeg com filtro concat:", {
-                    ffmpegPath: forcedFFmpegPath,
-                    args: ffmpegArgs,
-                    ffmpegExists: existsSync(forcedFFmpegPath)
-                });
-
-                // Verificação final antes de executar
-                if (!existsSync(forcedFFmpegPath)) {
-                    console.error("❌ Arquivo FFmpeg não existe:", forcedFFmpegPath);
-                    return {
-                        success: false,
-                        message: `Arquivo FFmpeg não encontrado: ${forcedFFmpegPath}`,
-                    };
-                }
+                console.log("🎬 Executando concatenação de vídeos...");
 
                 let stdout, stderr;
                 try {
-                    console.log("🎬 Iniciando execução do FFmpeg...");
-                    const result = await execFileAsync(forcedFFmpegPath, ffmpegArgs, {
+                    const result = await execFileAsync(ffmpegPath, ffmpegArgs, {
                         timeout: 60000, // 60 segundos timeout
                         maxBuffer: 1024 * 1024 * 10 // 10MB buffer
                     });
                     stdout = result.stdout;
                     stderr = result.stderr;
-                    console.log("✅ FFmpeg executado com sucesso");
                 } catch (error) {
+                    const execError = error as unknown;
                     console.error("❌ Erro na concatenação:", {
-                        error: error.message,
-                        code: error.code,
-                        path: error.path,
-                        spawnargs: error.spawnargs
+                        error: execError.message,
+                        code: execError.code,
+                        path: execError.path,
+                        spawnargs: execError.spawnargs
                     });
                     return {
                         success: false,
-                        message: `Erro na concatenação: ${error.message}. Código: ${error.code}`,
+                        message: `Erro na concatenação: ${execError.message}. Código: ${execError.code}`,
                     };
                 }
 
-                console.log("FFmpeg stdout:", stdout);
-                if (stderr) {
-                    console.log("FFmpeg stderr:", stderr);
-                }
-
                 // Verificar se o arquivo de saída foi criado
-                console.log("🔍 Verificando se arquivo de saída foi criado:", outputPath);
-                const outputExists = existsSync(outputPath);
-                console.log("🔍 Arquivo de saída existe:", outputExists);
-
-                if (outputExists) {
-                    const stats = statSync(outputPath);
-                    console.log("📊 Tamanho do arquivo final:", stats.size, "bytes");
-
+                if (existsSync(outputPath)) {
                     return {
                         success: true,
                         message: "Vídeos concatenados com sucesso",
                         outputPath,
                     };
                 } else {
-                    console.error("❌ Arquivo de saída não foi criado pelo FFmpeg");
                     return {
                         success: false,
-                        message: "Arquivo de saída não foi criado pelo FFmpeg",
+                        message: "Arquivo de saída não foi criado",
                     };
                 }
             } catch (error) {
                 console.error("Erro ao concatenar vídeos:", error);
                 return {
                     success: false,
-                    message: `Erro ao concatenar vídeos: ${error.message}`,
+                    message: `Erro ao concatenar vídeos: ${(error as Error).message}`,
                 };
             }
         }

@@ -5,7 +5,7 @@ export const HOSPITAL_INTRO_MAPPING = {
     "Hospital São Jose": "hsj.mp4",
     "Samuel Cesconetto": "me.mp4",
     "Unimed": "unimed.mp4",
-    "Hospital São João Batista": "hsj.mp4", // Usando o mesmo vídeo do São Jose por enquanto
+    "Hospital São João Batista": "hsjb.mp4",
     "Hospital São Donato": "hsd.mp4",
 } as const;
 
