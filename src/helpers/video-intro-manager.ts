@@ -12,7 +12,7 @@ export const HOSPITAL_INTRO_MAPPING = {
 export type HospitalName = keyof typeof HOSPITAL_INTRO_MAPPING;
 
 export class VideoIntroManager {
-    private static readonly ASSETS_PATH = "assets";
+    private static readonly ASSETS_PATH = "src/assets/videos";
 
     /**
      * Obtém o caminho do vídeo de introdução baseado no nome da instituição
