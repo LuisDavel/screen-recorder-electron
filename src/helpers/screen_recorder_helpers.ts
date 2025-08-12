@@ -1,6 +1,6 @@
 // Helpers para o Screen Recorder
 import { Buffer } from "buffer";
-import { concatenateWithIntro, generateIntroVideoFileName } from "./video-intro-renderer";
+import { concatenateWithIntroAndOutro, generateIntroVideoFileName } from "./video-intro-renderer";
 import { joinPath } from "@/utils/path-utils";
 // Obter fontes de captura disponíveis
 export async function getScreenSources(): Promise<ScreenSource[]> {
@@ -95,6 +95,8 @@ export async function saveWithIntroVideo(
 	saveLocation: string,
 	institutionName: string,
 	format?: string,
+	includeIntro: boolean = true,
+	includeOutro: boolean = false,
 ): Promise<{
 	success: boolean;
 	message: string;
@@ -106,7 +108,9 @@ export async function saveWithIntroVideo(
 			saveLocation,
 			institutionName,
 			format,
-			bufferSize: videoBuffer.length
+			bufferSize: videoBuffer.length,
+			includeIntro,
+			includeOutro
 		});
 
 		// Primeiro salvar o vídeo gravado temporariamente
@@ -121,17 +125,21 @@ export async function saveWithIntroVideo(
 		const finalFileName = generateIntroVideoFileName(institutionName, tempResult.fileName || "recording.mp4");
 		const finalFilePath = joinPath(saveLocation, finalFileName);
 
-		// Concatenar com vídeo de introdução
+		// Concatenar com vídeos de introdução e/ou encerramento
 		console.log("🎬 saveWithIntroVideo - Iniciando concatenação:", {
 			institutionName,
 			tempFilePath: tempResult.filePath,
-			finalFilePath
+			finalFilePath,
+			includeIntro,
+			includeOutro
 		});
 
-		const concatResult = await concatenateWithIntro(
+		const concatResult = await concatenateWithIntroAndOutro(
 			institutionName,
 			tempResult.filePath,
-			finalFilePath
+			finalFilePath,
+			includeIntro,
+			includeOutro
 		);
 
 		console.log("🎬 saveWithIntroVideo - Resultado da concatenação:", concatResult);
@@ -147,16 +155,26 @@ export async function saveWithIntroVideo(
 				// Não falhar por causa disso, apenas avisar
 			}
 
+			const videoTypes = [];
+			if (includeIntro) videoTypes.push("introdução");
+			if (includeOutro) videoTypes.push("encerramento");
+			const videoTypesText = videoTypes.length > 0 ? ` com ${videoTypes.join(" e ")}` : "";
+
 			return {
 				success: true,
-				message: "Vídeo salvo com introdução com sucesso",
+				message: `Vídeo salvo${videoTypesText} com sucesso`,
 				filePath: finalFilePath,
 				fileName: finalFileName
 			};
 		} else {
+			const videoTypes = [];
+			if (includeIntro) videoTypes.push("introdução");
+			if (includeOutro) videoTypes.push("encerramento");
+			const videoTypesText = videoTypes.length > 0 ? videoTypes.join(" e ") : "vídeos";
+
 			return {
 				success: false,
-				message: `Erro ao adicionar introdução: ${concatResult.message}`,
+				message: `Erro ao adicionar ${videoTypesText}: ${concatResult.message}`,
 				filePath: tempResult.filePath, // Retornar arquivo original se falhar
 				fileName: tempResult.fileName
 			};

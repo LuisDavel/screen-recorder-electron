@@ -1312,15 +1312,18 @@ export class AdvancedScreenRecorderManager {
 				localEspecifico: this.options?.saveLocation,
 			});
 
-			// Verificar se deve incluir vídeo de introdução
-			const shouldIncludeIntro = this.options?.headerConfig?.includeIntroVideo &&
+			// Verificar se deve incluir vídeos de introdução e encerramento
+			const shouldIncludeIntro = this.options?.headerConfig?.includeIntroVideo;
+			const shouldIncludeOutro = this.options?.headerConfig?.includeOutroVideo &&
 				this.options?.headerConfig?.institutionName;
 
-			console.log("🔍 DEBUG - Verificação de introdução:", {
+			console.log("🔍 DEBUG - Verificação de vídeos:", {
 				hasHeaderConfig: !!this.options?.headerConfig,
 				includeIntroVideo: this.options?.headerConfig?.includeIntroVideo,
+				includeOutroVideo: this.options?.headerConfig?.includeOutroVideo,
 				institutionName: this.options?.headerConfig?.institutionName,
-				shouldIncludeIntro
+				shouldIncludeIntro,
+				shouldIncludeOutro
 			});
 
 			if (this.options?.saveLocation) {
@@ -1333,18 +1336,25 @@ export class AdvancedScreenRecorderManager {
 					shouldIncludeIntro
 				);
 
-				if (shouldIncludeIntro) {
-					console.log("🎬 Salvando com vídeo de introdução para:", this.options.headerConfig.institutionName);
+				if (shouldIncludeIntro || shouldIncludeOutro) {
+					const videoTypes = [];
+					if (shouldIncludeIntro) videoTypes.push("introdução");
+					if (shouldIncludeOutro) videoTypes.push("encerramento");
+
+					console.log(`🎬 Salvando com ${videoTypes.join(" e ")} para:`, this.options.headerConfig.institutionName);
 					result = await saveWithIntroVideo(
 						videoBuffer,
 						this.options.saveLocation,
 						this.options.headerConfig.institutionName,
 						format,
+						shouldIncludeIntro,
+						shouldIncludeOutro,
 					);
 				} else {
-					console.log("📁 Salvando sem vídeo de introdução");
+					console.log("📁 Salvando sem vídeos de introdução/encerramento");
 					console.log("🔍 Motivo:", {
 						includeIntroVideo: this.options?.headerConfig?.includeIntroVideo,
+						includeOutroVideo: this.options?.headerConfig?.includeOutroVideo,
 						institutionName: this.options?.headerConfig?.institutionName,
 						headerEnabled: this.options?.headerConfig?.isEnabled
 					});

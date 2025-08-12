@@ -8,7 +8,7 @@ import {
     VIDEO_INTRO_GET_AVAILABLE_CHANNEL,
     VIDEO_INTRO_CHECK_INTRO_CHANNEL,
 } from "./video-intro-channels";
-import { VideoIntroManager, HOSPITAL_INTRO_MAPPING } from "../../video-intro-manager";
+import { VideoIntroManager, HOSPITAL_OUTRO_MAPPING } from "../../video-intro-manager";
 
 const execFileAsync = promisify(execFile);
 
@@ -46,23 +46,37 @@ export function addVideoIntroEventListeners(_mainWindow: BrowserWindow) {
         VIDEO_INTRO_CHECK_INTRO_CHANNEL,
         async (_event, institutionName: string) => {
             try {
-                const introPath = VideoIntroManager.getIntroVideoPath(institutionName);
+                // Vídeo de introdução sempre existe (me.mp4)
+                const introPath = VideoIntroManager.getIntroVideoPath();
+                const fullIntroPath = join(process.cwd(), introPath);
+                const introExists = existsSync(fullIntroPath);
 
-                if (!introPath) {
-                    return { hasIntro: false, path: null };
+                // Verificar vídeo de encerramento
+                const outroPath = VideoIntroManager.getOutroVideoPath(institutionName);
+                let outroExists = false;
+                let fullOutroPath = null;
+
+                if (outroPath) {
+                    fullOutroPath = join(process.cwd(), outroPath);
+                    outroExists = existsSync(fullOutroPath);
                 }
 
-                const fullPath = join(process.cwd(), introPath);
-                const exists = existsSync(fullPath);
-
                 return {
-                    hasIntro: exists,
-                    path: exists ? fullPath : null,
+                    hasIntro: introExists,
+                    introPath: introExists ? fullIntroPath : null,
+                    hasOutro: outroExists,
+                    outroPath: outroExists ? fullOutroPath : null,
                     institutionName
                 };
             } catch (error) {
-                console.error("Erro ao verificar vídeo de introdução:", error);
-                return { hasIntro: false, path: null, error: (error as Error).message };
+                console.error("Erro ao verificar vídeos:", error);
+                return {
+                    hasIntro: false,
+                    introPath: null,
+                    hasOutro: false,
+                    outroPath: null,
+                    error: (error as Error).message
+                };
             }
         }
     );
@@ -73,18 +87,29 @@ export function addVideoIntroEventListeners(_mainWindow: BrowserWindow) {
             const institutions = VideoIntroManager.getAvailableInstitutions();
             const availableInstitutions = [];
 
+            // Verificar vídeo de introdução (sempre me.mp4)
+            const introPath = VideoIntroManager.getIntroVideoPath();
+            const fullIntroPath = join(process.cwd(), introPath);
+            const hasIntro = existsSync(fullIntroPath);
+
             for (const institution of institutions) {
-                const introPath = VideoIntroManager.getIntroVideoPath(institution);
-                if (introPath) {
-                    const fullPath = join(process.cwd(), introPath);
-                    if (existsSync(fullPath)) {
-                        availableInstitutions.push({
-                            name: institution,
-                            videoPath: fullPath,
-                            videoFile: HOSPITAL_INTRO_MAPPING[institution]
-                        });
-                    }
+                const outroPath = VideoIntroManager.getOutroVideoPath(institution);
+                let hasOutro = false;
+                let fullOutroPath = null;
+
+                if (outroPath) {
+                    fullOutroPath = join(process.cwd(), outroPath);
+                    hasOutro = existsSync(fullOutroPath);
                 }
+
+                availableInstitutions.push({
+                    name: institution,
+                    hasIntro,
+                    introPath: hasIntro ? fullIntroPath : null,
+                    hasOutro,
+                    outroPath: hasOutro ? fullOutroPath : null,
+                    outroVideoFile: HOSPITAL_OUTRO_MAPPING[institution]
+                });
             }
 
             return {
@@ -110,10 +135,14 @@ export function addVideoIntroEventListeners(_mainWindow: BrowserWindow) {
                 institutionName,
                 recordedVideoPath,
                 outputPath,
+                includeIntro = true,
+                includeOutro = false,
             }: {
                 institutionName: string;
                 recordedVideoPath: string;
                 outputPath: string;
+                includeIntro?: boolean;
+                includeOutro?: boolean;
             }
         ) => {
             try {
@@ -121,24 +150,45 @@ export function addVideoIntroEventListeners(_mainWindow: BrowserWindow) {
                     institutionName,
                     recordedVideoPath,
                     outputPath,
+                    includeIntro,
+                    includeOutro,
                 });
 
-                const introPath = VideoIntroManager.getIntroVideoPath(institutionName);
+                let fullIntroPath = null;
+                let fullOutroPath = null;
 
-                if (!introPath) {
-                    return {
-                        success: false,
-                        message: `Vídeo de introdução não encontrado para ${institutionName}`,
-                    };
+                // Verificar vídeo de introdução se solicitado
+                if (includeIntro) {
+                    const introPath = VideoIntroManager.getIntroVideoPath();
+                    fullIntroPath = join(process.cwd(), introPath);
+
+                    if (!existsSync(fullIntroPath)) {
+                        return {
+                            success: false,
+                            message: `Arquivo de introdução não existe: ${fullIntroPath}`,
+                        };
+                    }
                 }
 
-                const fullIntroPath = join(process.cwd(), introPath);
+                // Verificar vídeo de encerramento se solicitado
+                if (includeOutro) {
+                    const outroPath = VideoIntroManager.getOutroVideoPath(institutionName);
 
-                if (!existsSync(fullIntroPath)) {
-                    return {
-                        success: false,
-                        message: `Arquivo de introdução não existe: ${fullIntroPath}`,
-                    };
+                    if (!outroPath) {
+                        return {
+                            success: false,
+                            message: `Vídeo de encerramento não encontrado para ${institutionName}`,
+                        };
+                    }
+
+                    fullOutroPath = join(process.cwd(), outroPath);
+
+                    if (!existsSync(fullOutroPath)) {
+                        return {
+                            success: false,
+                            message: `Arquivo de encerramento não existe: ${fullOutroPath}`,
+                        };
+                    }
                 }
 
                 if (!existsSync(recordedVideoPath)) {
@@ -150,18 +200,28 @@ export function addVideoIntroEventListeners(_mainWindow: BrowserWindow) {
 
                 console.log("🎬 Arquivos verificados:", {
                     introPath: fullIntroPath,
-                    introExists: existsSync(fullIntroPath),
+                    introExists: fullIntroPath ? existsSync(fullIntroPath) : false,
+                    outroPath: fullOutroPath,
+                    outroExists: fullOutroPath ? existsSync(fullOutroPath) : false,
                     recordedPath: recordedVideoPath,
                     recordedExists: existsSync(recordedVideoPath),
                     outputPath
                 });
 
                 // Verificar informações dos arquivos
-                if (existsSync(fullIntroPath)) {
+                if (fullIntroPath && existsSync(fullIntroPath)) {
                     const introStats = statSync(fullIntroPath);
                     console.log("📊 Arquivo de introdução:", {
                         size: introStats.size,
                         path: fullIntroPath
+                    });
+                }
+
+                if (fullOutroPath && existsSync(fullOutroPath)) {
+                    const outroStats = statSync(fullOutroPath);
+                    console.log("📊 Arquivo de encerramento:", {
+                        size: outroStats.size,
+                        path: fullOutroPath
                     });
                 }
 
@@ -183,17 +243,42 @@ export function addVideoIntroEventListeners(_mainWindow: BrowserWindow) {
                     };
                 }
 
-                // Usar filtro concat com normalização de resolução
-                // Normaliza ambos os vídeos para 2560x1080 (resolução do vídeo gravado)
+                // Construir argumentos do FFmpeg baseado nos vídeos incluídos
+                const inputs = [];
+                const filterParts = [];
+                let inputIndex = 0;
+                let concatInputs = "";
+
+                // Adicionar vídeo de introdução se solicitado
+                if (fullIntroPath) {
+                    inputs.push("-i", fullIntroPath);
+                    filterParts.push(`[${inputIndex}:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1[v${inputIndex}]`);
+                    concatInputs += `[v${inputIndex}][${inputIndex}:a]`;
+                    inputIndex++;
+                }
+
+                // Adicionar vídeo gravado
+                inputs.push("-i", recordedVideoPath);
+                filterParts.push(`[${inputIndex}:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1[v${inputIndex}]`);
+                concatInputs += `[v${inputIndex}][${inputIndex}:a]`;
+                inputIndex++;
+
+                // Adicionar vídeo de encerramento se solicitado
+                if (fullOutroPath) {
+                    inputs.push("-i", fullOutroPath);
+                    filterParts.push(`[${inputIndex}:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1[v${inputIndex}]`);
+                    concatInputs += `[v${inputIndex}][${inputIndex}:a]`;
+                    inputIndex++;
+                }
+
+                // Construir filtro de concatenação
+                const filterComplex = filterParts.join(";") + ";" +
+                    `${concatInputs}concat=n=${inputIndex}:v=1:a=1[outv][outa]`;
+
                 const ffmpegArgs = [
-                    "-i", fullIntroPath,           // Input 1: vídeo de introdução
-                    "-i", recordedVideoPath,       // Input 2: vídeo gravado
+                    ...inputs,                     // Todos os inputs
                     "-filter_complex",             // Usar filtro complexo
-                    // Normalizar ambos os vídeos para 1920x1080 (Full HD - resolução padrão)
-                    "[0:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1[v0];" +
-                    "[1:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1[v1];" +
-                    // Concatenar os vídeos normalizados
-                    "[v0][0:a][v1][1:a]concat=n=2:v=1:a=1[outv][outa]",
+                    filterComplex,                 // Filtro de normalização e concatenação
                     "-map", "[outv]",              // Mapear vídeo de saída
                     "-map", "[outa]",              // Mapear áudio de saída
                     "-c:v", "libx264",             // Codec de vídeo H.264
@@ -206,6 +291,17 @@ export function addVideoIntroEventListeners(_mainWindow: BrowserWindow) {
                 ];
 
                 console.log("🎬 Executando concatenação de vídeos...");
+                console.log("🔍 DEBUG - Argumentos do FFmpeg:", {
+                    ffmpegPath,
+                    inputs: inputs.length / 2, // Cada input tem 2 elementos (-i e path)
+                    filterComplex,
+                    totalInputs: inputIndex,
+                    includeIntro,
+                    includeOutro,
+                    fullIntroPath,
+                    fullOutroPath
+                });
+                console.log("🔍 DEBUG - Comando completo:", [ffmpegPath, ...ffmpegArgs].join(" "));
 
                 let stdout, stderr;
                 try {

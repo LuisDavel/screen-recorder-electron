@@ -1,32 +1,56 @@
 import { join } from "path";
 
-// Mapeamento dos hospitais com seus respectivos vídeos de introdução
-export const HOSPITAL_INTRO_MAPPING = {
+// Mapeamento dos hospitais com seus respectivos vídeos de encerramento
+export const HOSPITAL_OUTRO_MAPPING = {
     "Hospital São Jose": "hsj.mp4",
     "Samuel Cesconetto": "me.mp4",
     "Unimed": "unimed.mp4",
-    "Hospital São João Batista": "hsjb.mp4",
+    "Hospital São João Batista": "hsj.mp4", // Usando mesmo vídeo do São Jose
     "Hospital São Donato": "hsd.mp4",
 } as const;
 
-export type HospitalName = keyof typeof HOSPITAL_INTRO_MAPPING;
+// Vídeo de introdução sempre será o me.mp4
+export const INTRO_VIDEO_FILE = "me.mp4";
+
+export type HospitalName = keyof typeof HOSPITAL_OUTRO_MAPPING;
 
 export class VideoIntroManager {
     private static readonly ASSETS_PATH = "src/assets/videos";
 
     /**
-     * Obtém o caminho do vídeo de introdução baseado no nome da instituição
+     * Obtém o caminho do vídeo de introdução (sempre me.mp4)
      */
-    static getIntroVideoPath(institutionName: string): string | null {
-        const videoFileName = HOSPITAL_INTRO_MAPPING[institutionName as HospitalName];
+    static getIntroVideoPath(): string {
+        const path = join(this.ASSETS_PATH, INTRO_VIDEO_FILE);
+        console.log("🎬 VideoIntroManager - Caminho de introdução:", {
+            videoFileName: INTRO_VIDEO_FILE,
+            path,
+            assetsPath: this.ASSETS_PATH
+        });
+
+        return path;
+    }
+
+    /**
+     * Obtém o caminho do vídeo de encerramento baseado no nome da instituição
+     */
+    static getOutroVideoPath(institutionName: string): string | null {
+        console.log("🔍 VideoIntroManager - Buscando vídeo de encerramento:", {
+            institutionName,
+            availableInstitutions: Object.keys(HOSPITAL_OUTRO_MAPPING),
+            mapping: HOSPITAL_OUTRO_MAPPING
+        });
+
+        const videoFileName = HOSPITAL_OUTRO_MAPPING[institutionName as HospitalName];
 
         if (!videoFileName) {
-            console.warn(`Vídeo de introdução não encontrado para: ${institutionName}`);
+            console.warn(`Vídeo de encerramento não encontrado para: ${institutionName}`);
+            console.warn("Instituições disponíveis:", Object.keys(HOSPITAL_OUTRO_MAPPING));
             return null;
         }
 
         const path = join(this.ASSETS_PATH, videoFileName);
-        console.log("🎬 VideoIntroManager - Caminho gerado:", {
+        console.log("🎬 VideoIntroManager - Caminho de encerramento:", {
             institutionName,
             videoFileName,
             path,
@@ -37,49 +61,57 @@ export class VideoIntroManager {
     }
 
     /**
-     * Verifica se existe vídeo de introdução para a instituição
+     * Verifica se existe vídeo de introdução (sempre true, pois sempre usa me.mp4)
      */
-    static hasIntroVideo(institutionName: string): boolean {
-        return institutionName in HOSPITAL_INTRO_MAPPING;
+    static hasIntroVideo(): boolean {
+        return true;
     }
 
     /**
-     * Lista todas as instituições que possuem vídeos de introdução
+     * Verifica se existe vídeo de encerramento para a instituição
+     */
+    static hasOutroVideo(institutionName: string): boolean {
+        return institutionName in HOSPITAL_OUTRO_MAPPING;
+    }
+
+    /**
+     * Lista todas as instituições que possuem vídeos de encerramento
      */
     static getAvailableInstitutions(): HospitalName[] {
-        return Object.keys(HOSPITAL_INTRO_MAPPING) as HospitalName[];
+        return Object.keys(HOSPITAL_OUTRO_MAPPING) as HospitalName[];
     }
 
     /**
-     * Concatena o vídeo de introdução com o vídeo gravado usando FFmpeg
+     * Concatena vídeo de introdução + gravação + vídeo de encerramento usando FFmpeg
      * Esta função deve ser chamada no main process do Electron
      */
-    static async concatenateWithIntro(
+    static async concatenateWithIntroAndOutro(
         institutionName: string,
         recordedVideoPath: string,
-        outputPath: string
+        outputPath: string,
+        includeIntro: boolean = true,
+        includeOutro: boolean = false
     ): Promise<{ success: boolean; message: string; outputPath?: string }> {
         try {
-            const introVideoPath = this.getIntroVideoPath(institutionName);
+            const introVideoPath = includeIntro ? this.getIntroVideoPath() : null;
+            const outroVideoPath = includeOutro ? this.getOutroVideoPath(institutionName) : null;
 
-            if (!introVideoPath) {
+            if (includeOutro && !outroVideoPath) {
                 return {
                     success: false,
-                    message: `Vídeo de introdução não encontrado para ${institutionName}`
+                    message: `Vídeo de encerramento não encontrado para ${institutionName}`
                 };
             }
 
             // Aqui você implementaria a lógica de concatenação usando FFmpeg
-            // Por enquanto, vamos retornar uma simulação
             console.log(`Concatenando vídeos:
-				Introdução: ${introVideoPath}
+				${includeIntro ? `Introdução: ${introVideoPath}` : ''}
 				Gravação: ${recordedVideoPath}
+				${includeOutro ? `Encerramento: ${outroVideoPath}` : ''}
 				Saída: ${outputPath}
 			`);
 
             // TODO: Implementar concatenação real com FFmpeg
-            // const ffmpegCommand = `ffmpeg -i "${introVideoPath}" -i "${recordedVideoPath}" -filter_complex "[0:v][0:a][1:v][1:a]concat=n=2:v=1:a=1[outv][outa]" -map "[outv]" -map "[outa]" "${outputPath}"`;
-
             return {
                 success: true,
                 message: "Vídeos concatenados com sucesso",

@@ -14,8 +14,9 @@ export interface HeaderConfig {
 	crm: string;
 	externalId: string;
 	id: number;
-	// Configurações de vídeo de introdução
+	// Configurações de vídeo de introdução e encerramento
 	includeIntroVideo: boolean;
+	includeOutroVideo: boolean;
 }
 
 export interface FooterConfig {
@@ -46,6 +47,7 @@ const defaultHeaderConfig: HeaderConfig = {
 	externalId: "Código/ID",
 	id: 0,
 	includeIntroVideo: true,
+	includeOutroVideo: false,
 };
 
 const defaultFooterConfig: FooterConfig = {

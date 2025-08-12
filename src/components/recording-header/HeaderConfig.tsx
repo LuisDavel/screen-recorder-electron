@@ -29,6 +29,7 @@ import {
 import { Switch } from "../ui/switch";
 import {
 	hasIntroVideo as hasIntroVideoFn,
+	hasOutroVideo as hasOutroVideoFn,
 	getAvailableInstitutions,
 } from "@/helpers/video-intro-renderer";
 import { Badge } from "../ui/badge";
@@ -36,7 +37,8 @@ import { Badge } from "../ui/badge";
 export function HeaderConfig() {
 	const { headerConfig, updateHeaderConfig } = useHeaderConfigStore();
 	const [isOpen, setIsOpen] = React.useState(false);
-	const [hasIntroVideo, setHasIntroVideo] = React.useState(false);
+	const [hasIntroVideo, setHasIntroVideo] = React.useState(true); // Sempre true
+	const [hasOutroVideo, setHasOutroVideo] = React.useState(false);
 	const [availableInstitutions, setAvailableInstitutions] = React.useState<
 		string[]
 	>([]);
@@ -53,6 +55,9 @@ export function HeaderConfig() {
 		}
 		if (field === "includeIntroVideo") {
 			console.log("🎬 Vídeo de introdução alterado para:", value);
+		}
+		if (field === "includeOutroVideo") {
+			console.log("🎬 Vídeo de encerramento alterado para:", value);
 		}
 	};
 
@@ -71,13 +76,28 @@ export function HeaderConfig() {
 		setAvailableInstitutions(institutions);
 	}, []);
 
-	// Verificar se existe vídeo de introdução quando a instituição muda
+	// Verificar se existe vídeo de encerramento quando a instituição muda
 	React.useEffect(() => {
 		if (headerConfig.institutionName) {
-			const hasVideo = hasIntroVideoFn(headerConfig.institutionName);
-			setHasIntroVideo(hasVideo);
+			const hasOutro = hasOutroVideoFn(headerConfig.institutionName);
+			console.log("🔍 HeaderConfig - Verificando vídeo de encerramento:", {
+				institutionName: headerConfig.institutionName,
+				hasOutro
+			});
+			setHasOutroVideo(hasOutro);
 		}
 	}, [headerConfig.institutionName]);
+
+	// Log do estado atual para debug
+	React.useEffect(() => {
+		console.log("🔍 HeaderConfig - Estado atual:", {
+			includeIntroVideo: headerConfig.includeIntroVideo,
+			includeOutroVideo: headerConfig.includeOutroVideo,
+			institutionName: headerConfig.institutionName,
+			hasIntroVideo,
+			hasOutroVideo
+		});
+	}, [headerConfig.includeIntroVideo, headerConfig.includeOutroVideo, headerConfig.institutionName, hasIntroVideo, hasOutroVideo]);
 
 	return (
 		<Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -258,59 +278,84 @@ export function HeaderConfig() {
 										<SelectItem value="Hospital São Jose">
 											<div className="flex items-center justify-between w-full">
 												Hospital São Jose
-												{availableInstitutions.includes(
-													"Hospital São Jose",
-												) && (
-													<Badge variant="secondary" className="ml-2 text-xs">
+												<div className="flex gap-1 ml-2">
+													<Badge variant="secondary" className="text-xs">
 														Intro
 													</Badge>
-												)}
+													{availableInstitutions.includes(
+														"Hospital São Jose",
+													) && (
+														<Badge variant="outline" className="text-xs">
+															Outro
+														</Badge>
+													)}
+												</div>
 											</div>
 										</SelectItem>
 										<SelectItem value="Samuel Cesconetto">
 											<div className="flex items-center justify-between w-full">
 												Samuel Cesconetto
-												{availableInstitutions.includes(
-													"Samuel Cesconetto",
-												) && (
-													<Badge variant="secondary" className="ml-2 text-xs">
+												<div className="flex gap-1 ml-2">
+													<Badge variant="secondary" className="text-xs">
 														Intro
 													</Badge>
-												)}
+													{availableInstitutions.includes(
+														"Samuel Cesconetto",
+													) && (
+														<Badge variant="outline" className="text-xs">
+															Outro
+														</Badge>
+													)}
+												</div>
 											</div>
 										</SelectItem>
 										<SelectItem value="Unimed">
 											<div className="flex items-center justify-between w-full">
 												Unimed
-												{availableInstitutions.includes("Unimed") && (
-													<Badge variant="secondary" className="ml-2 text-xs">
+												<div className="flex gap-1 ml-2">
+													<Badge variant="secondary" className="text-xs">
 														Intro
 													</Badge>
-												)}
+													{availableInstitutions.includes("Unimed") && (
+														<Badge variant="outline" className="text-xs">
+															Outro
+														</Badge>
+													)}
+												</div>
 											</div>
 										</SelectItem>
 										<SelectItem value="Hospital São João Batista">
 											<div className="flex items-center justify-between w-full">
 												Hospital São João Batista
-												{availableInstitutions.includes(
-													"Hospital São João Batista",
-												) && (
-													<Badge variant="secondary" className="ml-2 text-xs">
+												<div className="flex gap-1 ml-2">
+													<Badge variant="secondary" className="text-xs">
 														Intro
 													</Badge>
-												)}
+													{availableInstitutions.includes(
+														"Hospital São João Batista",
+													) && (
+														<Badge variant="outline" className="text-xs">
+															Outro
+														</Badge>
+													)}
+												</div>
 											</div>
 										</SelectItem>
 										<SelectItem value="Hospital São Donato">
 											<div className="flex items-center justify-between w-full">
 												Hospital São Donato
-												{availableInstitutions.includes(
-													"Hospital São Donato",
-												) && (
-													<Badge variant="secondary" className="ml-2 text-xs">
+												<div className="flex gap-1 ml-2">
+													<Badge variant="secondary" className="text-xs">
 														Intro
 													</Badge>
-												)}
+													{availableInstitutions.includes(
+														"Hospital São Donato",
+													) && (
+														<Badge variant="outline" className="text-xs">
+															Outro
+														</Badge>
+													)}
+												</div>
 											</div>
 										</SelectItem>
 									</SelectContent>
@@ -371,24 +416,50 @@ export function HeaderConfig() {
 						</div>
 
 						{/* Vídeo de Introdução */}
-						<div className="flex items-center border p-4 rounder-md mb-4 mt-4 justify-between">
+						<div className="flex items-center border p-4 rounded-md mb-4 mt-4 justify-between">
 							<div>
 								<Label className="flex items-center gap-2 mb-2">
 									<FileText className="h-4 w-4" />
 									Vídeo de Introdução
 								</Label>
+								<p className="text-sm text-muted-foreground">
+									Sempre usa o vídeo me.mp4
+								</p>
 							</div>
 							<div className="flex items-center gap-2">
 								<Switch
-									checked={headerConfig.includeIntroVideo && hasIntroVideo}
+									checked={headerConfig.includeIntroVideo}
 									onCheckedChange={(checked) => {
-										// Só permitir ativar se há vídeo disponível
-										if (checked && !hasIntroVideo) {
-											return;
-										}
 										handleInputChange("includeIntroVideo", checked);
 									}}
-									disabled={!hasIntroVideo}
+								/>
+							</div>
+						</div>
+
+						{/* Vídeo de Encerramento */}
+						<div className="flex items-center border p-4 rounded-md mb-4 justify-between">
+							<div>
+								<Label className="flex items-center gap-2 mb-2">
+									<FileText className="h-4 w-4" />
+									Vídeo de Encerramento
+								</Label>
+								<p className="text-sm text-muted-foreground">
+									{hasOutroVideo
+										? `Usa o vídeo da instituição: ${headerConfig.institutionName}`
+										: "Não disponível para esta instituição"}
+								</p>
+							</div>
+							<div className="flex items-center gap-2">
+								<Switch
+									checked={headerConfig.includeOutroVideo && hasOutroVideo}
+									onCheckedChange={(checked) => {
+										// Só permitir ativar se há vídeo disponível
+										if (checked && !hasOutroVideo) {
+											return;
+										}
+										handleInputChange("includeOutroVideo", checked);
+									}}
+									disabled={!hasOutroVideo}
 								/>
 							</div>
 						</div>
