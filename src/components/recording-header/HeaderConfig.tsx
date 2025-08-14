@@ -358,6 +358,23 @@ export function HeaderConfig() {
 												</div>
 											</div>
 										</SelectItem>
+										<SelectItem value="CliniImagem">
+											<div className="flex items-center justify-between w-full">
+												CliniImagem
+												<div className="flex gap-1 ml-2">
+													<Badge variant="secondary" className="text-xs">
+														Intro
+													</Badge>
+													{availableInstitutions.includes(
+														"CliniImagem",
+													) && (
+														<Badge variant="outline" className="text-xs">
+															Outro
+														</Badge>
+													)}
+												</div>
+											</div>
+										</SelectItem>
 									</SelectContent>
 								</Select>
 							</div>

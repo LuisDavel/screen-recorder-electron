@@ -23,6 +23,7 @@ Os vídeos de encerramento estão localizados na pasta `src/assets/videos/` e ma
 - **Unimed** → `unimed.mp4`
 - **Hospital São João Batista** → `hsj.mp4` (mesmo vídeo do São Jose)
 - **Hospital São Donato** → `hsd.mp4`
+- **CliniImagem** → `clini.mp4`
 
 ## Requisitos
 
@@ -58,7 +59,8 @@ assets/
 ├── hsj.mp4      # Hospital São Jose
 ├── me.mp4       # Samuel Cesconetto
 ├── unimed.mp4   # Unimed
-└── hsd.mp4      # Hospital São Donato
+├── hsd.mp4      # Hospital São Donato
+└── clini.mp4    # CliniImagem
 ```
 
 ## Como Adicionar Novos Vídeos
@@ -94,6 +96,7 @@ assets/
 - **UNI** - Unimed
 - **HSJB** - Hospital São João Batista
 - **HSD** - Hospital São Donato
+- **CLI** - CliniImagem
 
 ## Interface do Usuário
 

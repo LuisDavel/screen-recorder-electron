@@ -26,6 +26,7 @@ const HOSPITAL_OUTRO_MAPPING = {
     "Unimed": "unimed.mp4",
     "Hospital São João Batista": "hsj.mp4", // Usando mesmo vídeo do São Jose
     "Hospital São Donato": "hsd.mp4",
+    "CliniImagem": "clini.mp4",
 } as const;
 
 // Vídeo de introdução sempre será o me.mp4
@@ -87,7 +88,8 @@ export function generateIntroVideoFileName(
         "Samuel Cesconetto": "SC",
         "Unimed": "UNI",
         "Hospital São João Batista": "HSJB",
-        "Hospital São Donato": "HSD"
+        "Hospital São Donato": "HSD",
+        "CliniImagem": "CLI"
     };
 
     const code = institutionCodes[institutionName] || "UNKNOWN";

@@ -18,7 +18,8 @@ export function VideoIntroOutroTest() {
 		"Samuel Cesconetto", 
 		"Unimed",
 		"Hospital São João Batista",
-		"Hospital São Donato"
+		"Hospital São Donato",
+		"CliniImagem"
 	];
 
 	const runTest = async () => {

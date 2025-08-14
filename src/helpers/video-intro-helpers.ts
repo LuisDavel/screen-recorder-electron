@@ -98,7 +98,8 @@ export function generateIntroVideoFileName(
         "Samuel Cesconetto": "SC",
         "Unimed": "UNI",
         "Hospital São João Batista": "HSJB",
-        "Hospital São Donato": "HSD"
+        "Hospital São Donato": "HSD",
+        "CliniImagem": "CLI"
     };
 
     const code = institutionCodes[institutionName] || "UNKNOWN";

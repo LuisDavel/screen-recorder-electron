@@ -6,6 +6,7 @@ export const HOSPITAL_VIDEOS = {
     "Unimed": "unimed.mp4",
     "Hospital São João Batista": "hsj.mp4",
     "Hospital São Donato": "hsd.mp4",
+    "CliniImagem": "clini.mp4",
 } as const;
 
 export type HospitalName = keyof typeof HOSPITAL_VIDEOS;

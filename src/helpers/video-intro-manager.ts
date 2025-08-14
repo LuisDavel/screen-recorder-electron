@@ -7,6 +7,7 @@ export const HOSPITAL_OUTRO_MAPPING = {
     "Unimed": "unimed.mp4",
     "Hospital São João Batista": "hsj.mp4", // Usando mesmo vídeo do São Jose
     "Hospital São Donato": "hsd.mp4",
+    "CliniImagem": "clini.mp4",
 } as const;
 
 // Vídeo de introdução sempre será o me.mp4
@@ -16,6 +17,21 @@ export type HospitalName = keyof typeof HOSPITAL_OUTRO_MAPPING;
 
 export class VideoIntroManager {
     private static readonly ASSETS_PATH = "src/assets/videos";
+
+    /**
+     * Obtém o caminho base dos assets considerando se está em desenvolvimento ou produção
+     */
+    private static getAssetsBasePath(): string {
+        // Em desenvolvimento, usar caminho relativo do projeto
+        if (process.env.NODE_ENV === 'development') {
+            return join(process.cwd(), this.ASSETS_PATH);
+        }
+
+        // Em produção, os assets devem estar na pasta resources do app empacotado
+        // O Electron Forge copia automaticamente a pasta src/assets para resources/app/src/assets
+        const { app } = require('electron');
+        return join(app.getAppPath(), this.ASSETS_PATH);
+    }
 
     /**
      * Obtém o caminho do vídeo de introdução (sempre me.mp4)
@@ -150,7 +166,8 @@ export class VideoIntroManager {
             "Samuel Cesconetto": "SC",
             "Unimed": "UNI",
             "Hospital São João Batista": "HSJB",
-            "Hospital São Donato": "HSD"
+            "Hospital São Donato": "HSD",
+            "CliniImagem": "CLI"
         };
 
         return codes[institutionName as HospitalName] || "UNKNOWN";
