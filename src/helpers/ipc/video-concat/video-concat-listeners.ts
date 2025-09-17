@@ -61,13 +61,30 @@ export function registerVideoConcatListeners(mainWindow: BrowserWindow) {
             return new Promise(async (resolve, reject) => {
                 const { recordedVideoPath, outputPath } = options;
 
-                // URL do vídeo remoto (fixo conforme solicitado)
-                const remoteVideoUrl = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WhatCarCanYouGetForAGrand.mp4';
+                // URLs dos vídeos remotos
+                const remoteVideoUrl1 = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WhatCarCanYouGetForAGrand.mp4';
+                const remoteVideoUrl2 = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4';
 
-                console.log('🎬 Iniciando concatenação ROBUSTA...');
+                console.log('🎬 Iniciando concatenação ROBUSTA com 3 vídeos...');
                 console.log('📍 FFmpeg path:', ffmpegPath);
-                console.log('🌐 Vídeo remoto:', remoteVideoUrl);
-                console.log('📁 Vídeo gravado:', recordedVideoPath);
+                console.log('🌐 Vídeo remoto 1 (início):', remoteVideoUrl1);
+                console.log('📁 Vídeo gravado (meio):', recordedVideoPath);
+                console.log('🌐 Vídeo remoto 2 (fim):', remoteVideoUrl2);
+
+                // Verificar se todas as URLs estão definidas
+                if (!remoteVideoUrl1) {
+                    const error = 'URL do vídeo remoto 1 não está definida';
+                    console.error('❌', error);
+                    reject(new Error(error));
+                    return;
+                }
+
+                if (!remoteVideoUrl2) {
+                    const error = 'URL do vídeo remoto 2 não está definida';
+                    console.error('❌', error);
+                    reject(new Error(error));
+                    return;
+                }
 
                 // Verificar se FFmpeg está disponível
                 if (!ffmpegPath) {
@@ -98,22 +115,25 @@ export function registerVideoConcatListeners(mainWindow: BrowserWindow) {
                 if (!finalOutputPath) {
                     const dir = path.dirname(recordedVideoPath);
                     const name = path.basename(recordedVideoPath, path.extname(recordedVideoPath));
-                    finalOutputPath = path.join(dir, `${name}-FINAL.mp4`);
+                    finalOutputPath = path.join(dir, `${name}-FINAL-3VIDEOS.mp4`);
                 }
 
                 console.log('📁 CAMINHO FINAL:', finalOutputPath);
 
-                // Método ROBUSTO: Normalizar e concatenar
+                // Método ROBUSTO: Normalizar e concatenar 3 vídeos (preservando duração)
                 const ffmpegArgs = [
-                    '-i', remoteVideoUrl,  // Input 0: vídeo remoto
-                    '-i', recordedVideoPath,  // Input 1: vídeo gravado
+                    '-i', remoteVideoUrl1,     // Input 0: vídeo remoto 1 (início)
+                    '-i', recordedVideoPath,   // Input 1: vídeo gravado (meio)
+                    '-i', remoteVideoUrl2,     // Input 2: vídeo remoto 2 (fim)
                     '-filter_complex',
-                    // Normalizar ambos os vídeos para o mesmo formato antes de concatenar
-                    '[0:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,fps=30,format=yuv420p[v0];' +
-                    '[1:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,fps=30,format=yuv420p[v1];' +
-                    '[0:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a0];' +
-                    '[1:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a1];' +
-                    '[v0][a0][v1][a1]concat=n=2:v=1:a=1[outv][outa]',
+                    // Normalizar todos os 3 vídeos SEM forçar FPS (preserva duração original)
+                    '[0:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,format=yuv420p,setpts=PTS-STARTPTS[v0];' +
+                    '[1:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,format=yuv420p,setpts=PTS-STARTPTS[v1];' +
+                    '[2:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,format=yuv420p,setpts=PTS-STARTPTS[v2];' +
+                    '[0:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo,asetpts=PTS-STARTPTS[a0];' +
+                    '[1:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo,asetpts=PTS-STARTPTS[a1];' +
+                    '[2:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo,asetpts=PTS-STARTPTS[a2];' +
+                    '[v0][a0][v1][a1][v2][a2]concat=n=3:v=1:a=1[outv][outa]',
                     '-map', '[outv]',
                     '-map', '[outa]',
                     '-c:v', 'libx264',
@@ -124,16 +144,22 @@ export function registerVideoConcatListeners(mainWindow: BrowserWindow) {
                     '-movflags', '+faststart',
                     '-avoid_negative_ts', 'make_zero',
                     '-fflags', '+genpts',
+                    '-vsync', 'cfr',
                     '-y',
                     finalOutputPath
                 ];
 
-                console.log('🔧 Comando FFmpeg:', `${ffmpegPath} ${ffmpegArgs.join(' ')}`);
+                console.log('🔧 Comando FFmpeg completo:');
+                console.log('🔧 Executável:', ffmpegPath);
+                console.log('🔧 Argumentos:', ffmpegArgs);
+                console.log('🔧 Comando completo:', `${ffmpegPath} ${ffmpegArgs.join(' ')}`);
 
                 // Função para tentar concatenação com fallback
                 const tryFFmpegConcatenation = (args: string[], method: string): Promise<unknown> => {
                     return new Promise((resolveFFmpeg, rejectFFmpeg) => {
                         console.log(`🎬 Tentando método: ${method}`);
+                        console.log(`🔧 Args do método ${method}:`, args);
+                        console.log(`🔧 Número de inputs: ${args.filter(arg => arg === '-i').length}`);
 
                         const ffmpegProcess: ChildProcess = spawn(ffmpegPath!, args);
                         let stderr = '';
@@ -194,11 +220,12 @@ export function registerVideoConcatListeners(mainWindow: BrowserWindow) {
                 } catch (error) {
                     console.log('⚠️ Método robusto falhou, tentando método simples...');
 
-                    // Método simples como fallback
+                    // Método simples como fallback (3 vídeos)
                     const simpleArgs = [
-                        '-i', remoteVideoUrl,
+                        '-i', remoteVideoUrl1,
                         '-i', recordedVideoPath,
-                        '-filter_complex', '[0:v][0:a][1:v][1:a]concat=n=2:v=1:a=1[outv][outa]',
+                        '-i', remoteVideoUrl2,
+                        '-filter_complex', '[0:v][0:a][1:v][1:a][2:v][2:a]concat=n=3:v=1:a=1[outv][outa]',
                         '-map', '[outv]',
                         '-map', '[outa]',
                         '-c:v', 'libx264',
@@ -214,11 +241,12 @@ export function registerVideoConcatListeners(mainWindow: BrowserWindow) {
                     } catch (simpleError) {
                         console.log('⚠️ Método simples falhou, tentando método de cópia...');
 
-                        // Método de cópia como último recurso
+                        // Método de cópia como último recurso (3 vídeos)
                         const copyArgs = [
-                            '-i', remoteVideoUrl,
+                            '-i', remoteVideoUrl1,
                             '-i', recordedVideoPath,
-                            '-filter_complex', '[0:v][1:v]concat=n=2:v=1[outv]; [0:a][1:a]concat=n=2:a=1[outa]',
+                            '-i', remoteVideoUrl2,
+                            '-filter_complex', '[0:v][1:v][2:v]concat=n=3:v=1[outv]; [0:a][1:a][2:a]concat=n=3:a=1[outa]',
                             '-map', '[outv]',
                             '-map', '[outa]',
                             '-c:v', 'copy',
@@ -329,6 +357,35 @@ export function registerVideoConcatListeners(mainWindow: BrowserWindow) {
             return debugInfo;
         });
         console.log("✅ Handler de debug registrado");
+
+        // Handler para debug específico de 3 vídeos
+        console.log("📡 Registrando handler de debug 3 vídeos: video-concat:debug-three-videos");
+        ipcMain.handle("video-concat:debug-three-videos", async () => {
+            const remoteVideoUrl1 = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WhatCarCanYouGetForAGrand.mp4';
+            const remoteVideoUrl2 = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4';
+
+            const debugInfo = {
+                remoteVideoUrl1,
+                remoteVideoUrl2,
+                ffmpegAvailable: !!ffmpegPath,
+                ffmpegPath,
+                testCommand: [
+                    '-i', remoteVideoUrl1,
+                    '-i', '/tmp/test.mp4',
+                    '-i', remoteVideoUrl2,
+                    '-filter_complex', '[0:v][0:a][1:v][1:a][2:v][2:a]concat=n=3:v=1:a=1[outv][outa]',
+                    '-map', '[outv]',
+                    '-map', '[outa]',
+                    '-t', '10', // Apenas 10 segundos para teste
+                    '-y',
+                    '/tmp/test-3videos-debug.mp4'
+                ]
+            };
+
+            console.log("🔍 Debug 3 vídeos:", debugInfo);
+            return debugInfo;
+        });
+        console.log("✅ Handler de debug 3 vídeos registrado");
 
         console.log("✅ Video concat listeners registrados com sucesso");
 

@@ -53,7 +53,10 @@ export function exposeVideoConcatContext() {
             }),
 
             // Debug de caminhos do FFmpeg
-            debugPaths: () => ipcRenderer.invoke("video-concat:debug-paths")
+            debugPaths: () => ipcRenderer.invoke("video-concat:debug-paths"),
+
+            // Debug específico de 3 vídeos
+            debugThreeVideos: () => ipcRenderer.invoke("video-concat:debug-three-videos")
         });
 
         console.log("✅ Video concat context exposto com sucesso");

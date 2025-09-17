@@ -2,6 +2,7 @@ import React from "react";
 import { VideoConcatenationTest } from "../components/VideoConcatenationTest";
 import { VideoConcatenationOverlay } from "../components/VideoConcatenationOverlay";
 import { VideoConcatDebug } from "../components/VideoConcatDebug";
+import { ThreeVideoTest } from "../components/ThreeVideoTest";
 import { useVideoConcatenation } from "../hooks/useVideoConcatenation";
 
 export function VideoConcatTestPage() {
@@ -13,15 +14,18 @@ export function VideoConcatTestPage() {
 			<div className="container mx-auto px-4">
 				<div className="text-center mb-8">
 					<h1 className="text-3xl font-bold text-gray-900 mb-2">
-						🎬 Sistema de Concatenação de Vídeos
+						🎬 Sistema de Concatenação de 3 Vídeos
 					</h1>
 					<p className="text-gray-600">
-						Teste e demonstração da funcionalidade de concatenação automática
+						Vídeo Remoto 1 + Vídeo Gravado + Vídeo Remoto 2
 					</p>
 				</div>
 
 				{/* Componente de debug */}
 				<VideoConcatDebug />
+
+				{/* Componente de teste de 3 vídeos */}
+				<ThreeVideoTest />
 
 				{/* Componente de teste manual */}
 				<VideoConcatenationTest />
@@ -46,10 +50,11 @@ export function VideoConcatTestPage() {
 
 							<div className="border-l-4 border-green-500 pl-4">
 								<h3 className="font-medium text-green-900">
-									2. Vídeo Introdutório
+									2. Sequência de 3 Vídeos
 								</h3>
 								<p className="text-sm text-gray-600">
-									O vídeo remoto é adicionado no início do seu vídeo gravado
+									Vídeo remoto 1 (início) + Seu vídeo gravado (meio) + Vídeo
+									remoto 2 (fim)
 								</p>
 							</div>
 
@@ -69,7 +74,7 @@ export function VideoConcatTestPage() {
 								</h3>
 								<p className="text-sm text-gray-600">
 									O vídeo final é salvo automaticamente com o sufixo
-									"-concatenated&quot;
+									"-FINAL-3VIDEOS.mp4&quot;
 								</p>
 							</div>
 						</div>

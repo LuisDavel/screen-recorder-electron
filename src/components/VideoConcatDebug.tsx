@@ -2,9 +2,10 @@ import React, { useState } from "react";
 
 interface VideoConcatAPI {
 	test: () => Promise<{ success: boolean; message: string }>;
-	testRobust: () => Promise<any>;
+	testRobust: () => Promise<unknown>;
 	checkFFmpeg: () => Promise<{ available: boolean; message: string }>;
 	debugPaths: () => Promise<unknown>;
+	debugThreeVideos: () => Promise<unknown>;
 }
 
 declare global {
@@ -83,6 +84,21 @@ export function VideoConcatDebug() {
 		}
 	};
 
+	const debugThreeVideos = async () => {
+		try {
+			addResult("🔍 Debugando configuração de 3 vídeos...");
+			if (!window.videoConcatAPI) {
+				addResult("❌ videoConcatAPI não disponível");
+				return;
+			}
+
+			const result = await window.videoConcatAPI.debugThreeVideos();
+			addResult(`🔍 Debug 3 vídeos: ${JSON.stringify(result, null, 2)}`);
+		} catch (error) {
+			addResult(`❌ Erro debug 3 vídeos: ${error}`);
+		}
+	};
+
 	const clearResults = () => {
 		setResults([]);
 	};
@@ -105,6 +121,9 @@ export function VideoConcatDebug() {
 				</button>
 				<button onClick={debugPaths} style={{ marginRight: "10px" }}>
 					🔍 Debug Caminhos FFmpeg
+				</button>
+				<button onClick={debugThreeVideos} style={{ marginRight: "10px" }}>
+					🔍 Debug 3 Vídeos
 				</button>
 				<button onClick={testFFmpeg} style={{ marginRight: "10px" }}>
 					🧪 Testar FFmpeg
