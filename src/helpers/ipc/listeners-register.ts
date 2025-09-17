@@ -10,6 +10,7 @@ import { addS3UploadEventListeners } from "./s3-upload/s3-upload-listeners";
 import { addVideoIntroEventListeners } from "./video-intro/video-intro-listeners";
 import { addFFmpegEventListeners } from "./ffmpeg/ffmpeg-listeners";
 import { addFileSystemEventListeners } from "./file-system/file-system-listeners";
+import { registerVideoConcatListeners } from "./video-concat/video-concat-listeners";
 
 // Debug log da importação
 console.log(
@@ -48,6 +49,11 @@ const CHANNELS_TO_REGISTER = [
 	"fs:delete-file",
 	"fs:exists",
 	"fs:move-file",
+	"video-concat:auto-concatenate",
+	"video-concat:auto-concatenate-alt",
+	"video-concat:auto-concatenate-robust",
+	"video-concat:concatenate",
+	"video-concat:check-ffmpeg",
 ];
 
 // Função para limpar handlers existentes
@@ -110,6 +116,18 @@ export default function registerListeners(mainWindow: BrowserWindow) {
 		// Registrar listeners do sistema de arquivos
 		addFileSystemEventListeners(mainWindow);
 		console.log("✅ Listeners do sistema de arquivos registrados");
+
+		// Registrar listeners de concatenação de vídeo
+		console.log("🔧 Tentando registrar listeners de concatenação de vídeo...");
+		console.log("🔍 Tipo da função registerVideoConcatListeners:", typeof registerVideoConcatListeners);
+
+		try {
+			registerVideoConcatListeners(mainWindow);
+			console.log("✅ Listeners de concatenação de vídeo registrados com sucesso");
+		} catch (error) {
+			console.error("❌ Erro ao registrar listeners de concatenação:", error);
+			throw error;
+		}
 
 		// Registrar logs e diagnósticos apenas em desenvolvimento
 		if (process.env.NODE_ENV === "development") {

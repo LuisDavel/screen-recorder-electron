@@ -192,6 +192,14 @@ if (document.readyState === "loading") {
 	startKeepAlive();
 }
 
+// Escutar eventos de concatenação de vídeo
+ipcRenderer.on("video-concat:start-auto-concatenation", (event, data) => {
+	console.log("🎬 Evento de auto-concatenação recebido no preload:", data);
+	window.dispatchEvent(new CustomEvent("video-concat:start-auto-concatenation", {
+		detail: data
+	}));
+});
+
 // Limpar recursos quando a janela for fechada
 window.addEventListener("beforeunload", () => {
 	if (keepAliveInterval) {

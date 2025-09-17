@@ -121,18 +121,18 @@ export async function saveWithIntroVideo(
 		const finalFileName = generateIntroVideoFileName(institutionName, tempResult.fileName || "recording.mp4");
 		const finalFilePath = joinPath(saveLocation, finalFileName);
 
-		// Concatenar com vídeo de introdução
-		console.log("🎬 saveWithIntroVideo - Iniciando concatenação:", {
+		// Concatenar com vídeo remoto usando nosso novo sistema
+		console.log("🎬 saveWithIntroVideo - Iniciando concatenação com vídeo remoto:", {
 			institutionName,
 			tempFilePath: tempResult.filePath,
 			finalFilePath
 		});
 
-		const concatResult = await concatenateWithIntro(
-			institutionName,
-			tempResult.filePath,
-			finalFilePath
-		);
+		// Usar nosso novo sistema de concatenação com vídeo remoto
+		const concatResult = await window.videoConcatAPI.autoConcatenate({
+			recordedVideoPath: tempResult.filePath,
+			outputPath: finalFilePath
+		});
 
 		console.log("🎬 saveWithIntroVideo - Resultado da concatenação:", concatResult);
 

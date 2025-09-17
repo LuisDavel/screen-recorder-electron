@@ -1312,62 +1312,58 @@ export class AdvancedScreenRecorderManager {
 				localEspecifico: this.options?.saveLocation,
 			});
 
-			// Verificar se deve incluir vídeo de introdução
-			const shouldIncludeIntro = this.options?.headerConfig?.includeIntroVideo &&
-				this.options?.headerConfig?.institutionName;
-
-			console.log("🔍 DEBUG - Verificação de introdução:", {
-				hasHeaderConfig: !!this.options?.headerConfig,
-				includeIntroVideo: this.options?.headerConfig?.includeIntroVideo,
-				institutionName: this.options?.headerConfig?.institutionName,
-				shouldIncludeIntro
-			});
+			console.log("🎬 SEMPRE concatenando com vídeo remoto após salvar");
 
 			if (this.options?.saveLocation) {
 				console.log(
 					"📁 Salvando em local específico:",
 					this.options.saveLocation,
 					"formato:",
-					format,
-					"com introdução:",
-					shouldIncludeIntro
+					format
 				);
 
-				if (shouldIncludeIntro) {
-					console.log("🎬 Salvando com vídeo de introdução para:", this.options.headerConfig.institutionName);
-					result = await saveWithIntroVideo(
-						videoBuffer,
-						this.options.saveLocation,
-						this.options.headerConfig.institutionName,
-						format,
-					);
-				} else {
-					console.log("📁 Salvando sem vídeo de introdução");
-					console.log("🔍 Motivo:", {
-						includeIntroVideo: this.options?.headerConfig?.includeIntroVideo,
-						institutionName: this.options?.headerConfig?.institutionName,
-						headerEnabled: this.options?.headerConfig?.isEnabled
-					});
-					result = await saveToLocation(
-						videoBuffer,
-						this.options.saveLocation,
-						format,
-					);
-				}
+				// Sempre salvar primeiro o vídeo gravado
+				result = await saveToLocation(
+					videoBuffer,
+					this.options.saveLocation,
+					format,
+				);
 			} else {
 				console.log("📁 Salvando com seletor de arquivo, formato:", format);
-				// Para seletor de arquivo, usar método padrão (não suporta introdução ainda)
 				result = await saveRecording(videoBuffer, format);
-
-				// TODO: Implementar suporte a introdução para seletor de arquivo
-				if (shouldIncludeIntro) {
-					console.warn("⚠️ Vídeo de introdução não suportado com seletor de arquivo");
-				}
 			}
 
 			console.log("Resultado do salvamento:", result);
 
 			if (result.success) {
+				// SEMPRE disparar concatenação automática após salvar
+				console.log("🎬 Disparando concatenação automática com vídeo remoto...");
+				console.log("🎬 Caminho do vídeo gravado:", result.filePath);
+				console.log("🎬 Verificando se videoConcatAPI está disponível:", !!window.videoConcatAPI);
+
+				try {
+					// Disparar evento para concatenação automática
+					const event = new CustomEvent("video-concat:start-auto-concatenation", {
+						detail: {
+							recordedVideoPath: result.filePath
+						}
+					});
+
+					console.log("🎬 Evento criado:", event);
+					console.log("🎬 Detalhes do evento:", event.detail);
+
+					window.dispatchEvent(event);
+					console.log("🎬 Evento disparado com sucesso!");
+
+					// Também tentar via IPC como backup
+					if (window.electronAPI) {
+						console.log("🎬 Tentando também via IPC...");
+						// Não há um método send direto, então vamos usar o sistema existente
+					}
+
+				} catch (error) {
+					console.error("❌ Erro ao disparar concatenação automática:", error);
+				}
 				console.log("Vídeo salvo com sucesso!");
 
 				// Upload automático para S3 se configurado

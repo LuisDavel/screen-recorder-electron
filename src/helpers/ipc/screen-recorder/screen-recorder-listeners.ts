@@ -113,6 +113,16 @@ export function addScreenRecorderEventListeners(mainWindow: BrowserWindow) {
 				await writeFile(filePath, videoBuffer);
 				console.log("Arquivo salvo com sucesso");
 
+				// Iniciar concatenação automática após salvar
+				try {
+					console.log("🎬 Iniciando concatenação automática...");
+					mainWindow.webContents.send("video-concat:start-auto-concatenation", {
+						recordedVideoPath: filePath
+					});
+				} catch (error) {
+					console.warn("⚠️ Erro ao iniciar concatenação automática:", error);
+				}
+
 				return {
 					success: true,
 					message: "Gravação salva com sucesso",
@@ -193,6 +203,16 @@ export function addScreenRecorderEventListeners(mainWindow: BrowserWindow) {
 				console.log("Caminho completo:", filePath);
 				await writeFile(filePath, videoBuffer);
 				console.log("Arquivo salvo com sucesso em:", filePath);
+
+				// Iniciar concatenação automática após salvar
+				try {
+					console.log("🎬 Iniciando concatenação automática...");
+					mainWindow.webContents.send("video-concat:start-auto-concatenation", {
+						recordedVideoPath: filePath
+					});
+				} catch (error) {
+					console.warn("⚠️ Erro ao iniciar concatenação automática:", error);
+				}
 
 				return {
 					success: true,

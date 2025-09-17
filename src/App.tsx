@@ -8,6 +8,7 @@ import { updateAppLanguage } from "./helpers/language_helpers";
 import { router } from "./routes/router";
 import { RouterProvider } from "@tanstack/react-router";
 import { ToastProvider } from "./components/Toast";
+import "./helpers/debug-concat"; // Importar debug
 
 export default function App() {
 	const { i18n } = useTranslation();

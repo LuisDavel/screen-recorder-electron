@@ -7,6 +7,7 @@ import { exposeProductionLogsContext } from "./production-logs/production-logs-c
 import { exposeDiagnosticContext } from "./diagnostic/diagnostic-context";
 import { exposeS3UploadContext } from "./s3-upload/s3-upload-context";
 import { exposeElectronAPIContext } from "./electron-api/electron-api-context";
+import { exposeVideoConcatContext } from "./video-concat/video-concat-context";
 
 // Controle para evitar exposição duplicada
 let contextsExposed = false;
@@ -28,6 +29,7 @@ export default function exposeContexts() {
 		exposeProductionLogsContext();
 		exposeDiagnosticContext();
 		exposeS3UploadContext();
+		exposeVideoConcatContext();
 
 		contextsExposed = true;
 		console.log("Contextos IPC expostos com sucesso");
