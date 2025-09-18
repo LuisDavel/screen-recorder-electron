@@ -3,6 +3,7 @@ import { VideoConcatenationTest } from "../components/VideoConcatenationTest";
 import { VideoConcatenationOverlay } from "../components/VideoConcatenationOverlay";
 import { VideoConcatDebug } from "../components/VideoConcatDebug";
 import { ThreeVideoTest } from "../components/ThreeVideoTest";
+import { VideoQualityTest } from "../components/VideoQualityTest";
 import { useVideoConcatenation } from "../hooks/useVideoConcatenation";
 
 export function VideoConcatTestPage() {
@@ -23,6 +24,9 @@ export function VideoConcatTestPage() {
 
 				{/* Componente de debug */}
 				<VideoConcatDebug />
+
+				{/* Componente de teste de qualidade melhorada */}
+				<VideoQualityTest />
 
 				{/* Componente de teste de 3 vídeos */}
 				<ThreeVideoTest />
@@ -74,7 +78,7 @@ export function VideoConcatTestPage() {
 								</h3>
 								<p className="text-sm text-gray-600">
 									O vídeo final é salvo automaticamente com o sufixo
-									"-FINAL-3VIDEOS.mp4&quot;
+									&quot;-FINAL-3VIDEOS.mp4&quot;
 								</p>
 							</div>
 						</div>

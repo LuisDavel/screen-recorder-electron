@@ -215,59 +215,88 @@ export function registerVideoConcatListeners(mainWindow: BrowserWindow) {
 
                 // Tentar método robusto primeiro
                 try {
-                    const result = await tryFFmpegConcatenation(ffmpegArgs, 'Robusto com Normalização');
+                    const result = await tryFFmpegConcatenation(ffmpegArgs, 'Robusto com Normalização Suave');
                     resolve(result);
                 } catch (error) {
-                    console.log('⚠️ Método robusto falhou, tentando método simples...');
+                    console.log('⚠️ Método robusto falhou, tentando método preservando características originais...');
 
-                    // Método simples como fallback (3 vídeos)
-                    const simpleArgs = [
+                    // Método que preserva características originais
+                    const preserveArgs = [
                         '-i', remoteVideoUrl1,
                         '-i', recordedVideoPath,
                         '-i', remoteVideoUrl2,
-                        '-filter_complex', '[0:v][0:a][1:v][1:a][2:v][2:a]concat=n=3:v=1:a=1[outv][outa]',
+                        '-filter_complex',
+                        // Apenas ajustar timestamps, sem normalização pesada
+                        '[0:v]setpts=PTS-STARTPTS[v0];' +
+                        '[1:v]setpts=PTS-STARTPTS[v1];' +
+                        '[2:v]setpts=PTS-STARTPTS[v2];' +
+                        '[0:a]asetpts=PTS-STARTPTS[a0];' +
+                        '[1:a]asetpts=PTS-STARTPTS[a1];' +
+                        '[2:a]asetpts=PTS-STARTPTS[a2];' +
+                        '[v0][a0][v1][a1][v2][a2]concat=n=3:v=1:a=1[outv][outa]',
                         '-map', '[outv]',
                         '-map', '[outa]',
                         '-c:v', 'libx264',
                         '-c:a', 'aac',
-                        '-preset', 'ultrafast',
+                        '-preset', 'fast',
                         '-y',
                         finalOutputPath
                     ];
 
                     try {
-                        const result = await tryFFmpegConcatenation(simpleArgs, 'Simples');
+                        const result = await tryFFmpegConcatenation(preserveArgs, 'Preservando Originais');
                         resolve(result);
-                    } catch (simpleError) {
-                        console.log('⚠️ Método simples falhou, tentando método de cópia...');
+                    } catch (preserveError) {
+                        console.log('⚠️ Método preservando originais falhou, tentando método simples...');
 
-                        // Método de cópia como último recurso (3 vídeos)
-                        const copyArgs = [
+                        // Método simples como fallback (3 vídeos)
+                        const simpleArgs = [
                             '-i', remoteVideoUrl1,
                             '-i', recordedVideoPath,
                             '-i', remoteVideoUrl2,
-                            '-filter_complex', '[0:v][1:v][2:v]concat=n=3:v=1[outv]; [0:a][1:a][2:a]concat=n=3:a=1[outa]',
+                            '-filter_complex', '[0:v][0:a][1:v][1:a][2:v][2:a]concat=n=3:v=1:a=1[outv][outa]',
                             '-map', '[outv]',
                             '-map', '[outa]',
-                            '-c:v', 'copy',
-                            '-c:a', 'copy',
+                            '-c:v', 'libx264',
+                            '-c:a', 'aac',
+                            '-preset', 'ultrafast',
                             '-y',
                             finalOutputPath
                         ];
 
                         try {
-                            const result = await tryFFmpegConcatenation(copyArgs, 'Cópia');
+                            const result = await tryFFmpegConcatenation(simpleArgs, 'Simples');
                             resolve(result);
-                        } catch (copyError) {
-                            reject(new Error(`Todos os métodos falharam. Último erro: ${copyError}`));
+                        } catch (simpleError) {
+                            console.log('⚠️ Método simples falhou, tentando método de cópia...');
+
+                            // Método de cópia como último recurso (3 vídeos)
+                            const copyArgs = [
+                                '-i', remoteVideoUrl1,
+                                '-i', recordedVideoPath,
+                                '-i', remoteVideoUrl2,
+                                '-filter_complex', '[0:v][1:v][2:v]concat=n=3:v=1[outv]; [0:a][1:a][2:a]concat=n=3:a=1[outa]',
+                                '-map', '[outv]',
+                                '-map', '[outa]',
+                                '-c:v', 'copy',
+                                '-c:a', 'copy',
+                                '-y',
+                                finalOutputPath
+                            ];
+
+                            try {
+                                const result = await tryFFmpegConcatenation(copyArgs, 'Cópia');
+                                resolve(result);
+                            } catch (copyError) {
+                                reject(new Error(`Todos os métodos falharam. Último erro: ${copyError}`));
+                            }
                         }
                     }
-                }
 
-                // Remover o código antigo que estava aqui
+                    // Remover o código antigo que estava aqui
 
 
-            });
+                });
         });
         console.log("✅ Handler auto-concatenate-robust registrado");
 
