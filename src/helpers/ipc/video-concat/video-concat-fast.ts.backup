@@ -1,0 +1,623 @@
+import { ipcMain, BrowserWindow } from "electron";
+import { spawn, ChildProcess } from "child_process";
+import path from "path";
+import fs from "fs";
+import ffmpegStatic from "ffmpeg-static";
+
+// Função para encontrar o caminho correto do FFmpeg
+function getFFmpegPath(): string | null {
+  if (ffmpegStatic && fs.existsSync(ffmpegStatic)) {
+    return ffmpegStatic;
+  }
+
+  const possiblePaths = [
+    path.join(process.cwd(), "node_modules", "ffmpeg-static", "ffmpeg"),
+    path.join(
+      __dirname,
+      "..",
+      "..",
+      "..",
+      "node_modules",
+      "ffmpeg-static",
+      "ffmpeg",
+    ),
+    path.join(
+      process.resourcesPath || process.cwd(),
+      "node_modules",
+      "ffmpeg-static",
+      "ffmpeg",
+    ),
+    "ffmpeg",
+  ];
+
+  for (const testPath of possiblePaths) {
+    if (fs.existsSync(testPath)) {
+      return testPath;
+    }
+  }
+
+  return null;
+}
+
+const ffmpegPath = getFFmpegPath();
+
+// Função para extrair nome do vídeo da URL S3
+function extractVideoName(url: string): string {
+  try {
+    const urlObj = new URL(url);
+    const pathParts = urlObj.pathname.split("/");
+    const fileName = pathParts[pathParts.length - 1];
+    return decodeURIComponent(fileName);
+  } catch {
+    return "Nome não identificado";
+  }
+}
+
+export function registerFastVideoConcatListeners(mainWindow: BrowserWindow) {
+  console.log("🚀 Registrando listeners OTIMIZADOS para video concat...");
+
+  // Handler OTIMIZADO - Método direto e rápido
+  ipcMain.handle(
+    "video-concat:fast-concatenate",
+    async (
+      _event,
+      options: {
+        recordedVideoPath: string;
+        outputPath?: string;
+        introVideoUrl?: string;
+        outroVideoUrl?: string;
+      },
+    ) => {
+      return new Promise((resolve, reject) => {
+        const { recordedVideoPath, outputPath, introVideoUrl, outroVideoUrl } =
+          options;
+
+        // APENAS URLs S3 - sem vídeos demo
+        if (!introVideoUrl || !outroVideoUrl) {
+          reject(
+            new Error(
+              "URLs de vídeos S3 são obrigatórias. Configure os vídeos de introdução e encerramento nas configurações.",
+            ),
+          );
+          return;
+        }
+
+        const remoteVideoUrl1 = introVideoUrl;
+        const remoteVideoUrl2 = outroVideoUrl;
+
+        // LOG DETALHADO DAS REQUISIÇÕES S3
+        console.log("🎬 ========================================");
+        console.log("🎬     CONCATENAÇÃO DE VÍDEO S3");
+        console.log("🎬 ========================================");
+        console.log("📹 Vídeo de Introdução:");
+        console.log(`   📄 Nome: ${extractVideoName(introVideoUrl)}`);
+        console.log(`   🔗 URL: ${introVideoUrl.substring(0, 100)}...`);
+        console.log("🎭 Vídeo de Encerramento:");
+        console.log(`   📄 Nome: ${extractVideoName(outroVideoUrl)}`);
+        console.log(`   🔗 URL: ${outroVideoUrl.substring(0, 100)}...`);
+        console.log("📁 Vídeo Gravado:");
+        console.log(`   📄 Caminho: ${recordedVideoPath}`);
+        console.log("🚀 Iniciando concatenação otimizada...");
+
+        if (!ffmpegPath || !fs.existsSync(ffmpegPath)) {
+          reject(new Error("FFmpeg não disponível"));
+          return;
+        }
+
+        if (!fs.existsSync(recordedVideoPath)) {
+          reject(
+            new Error(`Arquivo gravado não encontrado: ${recordedVideoPath}`),
+          );
+          return;
+        }
+
+        // Gerar caminho de saída
+        let finalOutputPath = outputPath;
+        if (!finalOutputPath) {
+          const dir = path.dirname(recordedVideoPath);
+          const name = path.basename(
+            recordedVideoPath,
+            path.extname(recordedVideoPath),
+          );
+          finalOutputPath = path.join(dir, `${name}-FAST-CONCAT.mp4`);
+        }
+
+        console.log("📁 Output:", finalOutputPath);
+
+        // ESTRATÉGIA SEQUENCIAL para vídeos 4K pesados
+        console.log("🔄 Usando estratégia SEQUENCIAL para vídeos 4K...");
+
+        const tempDir = path.dirname(finalOutputPath);
+        const tempIntro = path.join(tempDir, "temp_intro_processed.mp4");
+        const tempOutro = path.join(tempDir, "temp_outro_processed.mp4");
+        const tempStep1 = path.join(tempDir, "temp_intro_recorded.mp4");
+
+        try {
+          // ETAPA 1: Pré-processar e baixar vídeo de introdução
+          console.log("🔄 ETAPA 1/4: Processando vídeo de introdução...");
+          mainWindow.webContents.send(
+            "video-concat:progress",
+            "🔄 Etapa 1/4: Processando introdução...",
+          );
+
+          const introArgs = [
+            "-hide_banner",
+            "-threads",
+            "0",
+            "-timeout",
+            "60000000", // 60 segundos para download
+            "-reconnect",
+            "1",
+            "-reconnect_at_eof",
+            "1",
+            "-user_agent",
+            "FFmpeg/ElectronApp",
+
+            "-i",
+            remoteVideoUrl1,
+
+            // Reduzir qualidade para 1080p se for 4K
+            "-vf",
+            "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "fast",
+            "-crf",
+            "28",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "128k",
+            "-movflags",
+            "+faststart",
+
+            "-y",
+            tempIntro,
+          ];
+
+          await execFFmpeg(introArgs, "Processar Introdução");
+
+          // ETAPA 2: Pré-processar vídeo de encerramento
+          console.log("🔄 ETAPA 2/4: Processando vídeo de encerramento...");
+          mainWindow.webContents.send(
+            "video-concat:progress",
+            "🔄 Etapa 2/4: Processando encerramento...",
+          );
+
+          const outroArgs = [
+            "-hide_banner",
+            "-threads",
+            "0",
+            "-timeout",
+            "60000000",
+            "-reconnect",
+            "1",
+            "-reconnect_at_eof",
+            "1",
+            "-user_agent",
+            "FFmpeg/ElectronApp",
+
+            "-i",
+            remoteVideoUrl2,
+
+            "-vf",
+            "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "fast",
+            "-crf",
+            "28",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "128k",
+            "-movflags",
+            "+faststart",
+
+            "-y",
+            tempOutro,
+          ];
+
+          await execFFmpeg(outroArgs, "Processar Encerramento");
+
+          // ETAPA 3: Concatenar introdução + vídeo gravado
+          console.log("🔄 ETAPA 3/4: Concatenando introdução + gravação...");
+          mainWindow.webContents.send(
+            "video-concat:progress",
+            "🔄 Etapa 3/4: Concatenando intro + gravação...",
+          );
+
+          const step1Args = [
+            "-hide_banner",
+            "-threads",
+            "0",
+            "-i",
+            tempIntro,
+            "-i",
+            recordedVideoPath,
+
+            "-filter_complex",
+            "[0:v][0:a][1:v][1:a]concat=n=2:v=1:a=1[outv][outa]",
+            "-map",
+            "[outv]",
+            "-map",
+            "[outa]",
+
+            "-c:v",
+            "libx264",
+            "-preset",
+            "fast",
+            "-crf",
+            "28",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "128k",
+
+            "-y",
+            tempStep1,
+          ];
+
+          await execFFmpeg(step1Args, "Concat Intro+Gravação");
+
+          // ETAPA 4: Adicionar vídeo de encerramento
+          console.log("🔄 ETAPA 4/4: Adicionando encerramento...");
+          mainWindow.webContents.send(
+            "video-concat:progress",
+            "🔄 Etapa 4/4: Finalizando...",
+          );
+
+          const finalArgs = [
+            "-hide_banner",
+            "-threads",
+            "0",
+            "-i",
+            tempStep1,
+            "-i",
+            tempOutro,
+
+            "-filter_complex",
+            "[0:v][0:a][1:v][1:a]concat=n=2:v=1:a=1[outv][outa]",
+            "-map",
+            "[outv]",
+            "-map",
+            "[outa]",
+
+            "-c:v",
+            "libx264",
+            "-preset",
+            "fast",
+            "-crf",
+            "28",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "128k",
+            "-movflags",
+            "+faststart",
+
+            "-y",
+            finalOutputPath,
+          ];
+
+          await execFFmpeg(finalArgs, "Finalizar Concatenação");
+
+          // Sucesso - limpar arquivos temporários
+          console.log("✅ Concatenação SEQUENCIAL concluída!");
+          const stats = fs.statSync(finalOutputPath);
+          console.log(
+            "📊 Tamanho:",
+            (stats.size / 1024 / 1024).toFixed(2),
+            "MB",
+          );
+
+          resolve({
+            success: true,
+            outputPath: finalOutputPath,
+            message: "Vídeo concatenado com estratégia SEQUENCIAL otimizada!",
+            fileSize: stats.size,
+            method: "sequential-4k-optimized",
+          });
+        } catch (sequentialError) {
+          console.error("❌ Erro na estratégia sequencial:", sequentialError);
+          reject(sequentialError);
+        } finally {
+          // Limpar arquivos temporários
+          [tempIntro, tempOutro, tempStep1].forEach((file) => {
+            if (fs.existsSync(file)) {
+              try {
+                fs.unlinkSync(file);
+                console.log(`🗑️ Removido arquivo temporário: ${file}`);
+              } catch (cleanupError) {
+                console.warn(`⚠️ Erro ao limpar ${file}:`, cleanupError);
+              }
+            }
+          });
+        }
+
+        // Função auxiliar para executar FFmpeg com Promise
+        function execFFmpeg(args: string[], stepName: string): Promise<void> {
+          return new Promise((resolveExec, rejectExec) => {
+            console.log(`🎬 ${stepName}: ${ffmpegPath} ${args.join(" ")}`);
+
+            const process = spawn(ffmpegPath!, args);
+            let stderr = "";
+
+            process.stderr?.on("data", (data: Buffer) => {
+              const output = data.toString();
+              stderr += output;
+
+              // Mostrar progresso no console
+              if (output.includes("frame=") || output.includes("time=")) {
+                console.log(`📊 ${stepName}:`, output.trim().split("\n").pop());
+              }
+
+              // Enviar progresso para UI
+              mainWindow.webContents.send(
+                "video-concat:progress",
+                `${stepName}: ${output}`,
+              );
+            });
+
+            process.on("close", (code: number | null) => {
+              console.log(`🏁 ${stepName} finalizado com código: ${code}`);
+
+              if (code === 0) {
+                resolveExec();
+              } else {
+                console.error(`❌ Erro ${stepName}:`, stderr.slice(-500));
+                rejectExec(
+                  new Error(`${stepName} falhou: ${stderr.slice(-200)}`),
+                );
+              }
+            });
+
+            process.on("error", (error: Error) => {
+              console.error(`❌ Erro processo ${stepName}:`, error);
+              rejectExec(new Error(`Erro ${stepName}: ${error.message}`));
+            });
+          });
+        }
+      });
+    },
+  );
+
+  // Handler alternativo para casos extremos - apenas copy sem recodificação
+  ipcMain.handle(
+    "video-concat:ultra-fast-copy",
+    async (
+      _event,
+      options: {
+        recordedVideoPath: string;
+        outputPath?: string;
+        introVideoUrl?: string;
+        outroVideoUrl?: string;
+      },
+    ) => {
+      return new Promise((resolve, reject) => {
+        const { recordedVideoPath, outputPath } = options;
+
+        if (
+          !ffmpegPath ||
+          !fs.existsSync(ffmpegPath) ||
+          !fs.existsSync(recordedVideoPath)
+        ) {
+          reject(new Error("FFmpeg ou arquivo não disponível"));
+          return;
+        }
+
+        let finalOutputPath = outputPath;
+        if (!finalOutputPath) {
+          const dir = path.dirname(recordedVideoPath);
+          const name = path.basename(
+            recordedVideoPath,
+            path.extname(recordedVideoPath),
+          );
+          finalOutputPath = path.join(dir, `${name}-COPY-ONLY.mp4`);
+        }
+
+        console.log("⚡ Usando copy apenas (sem recodificação)...");
+
+        // Método copy - sem recodificação, apenas demux
+        const tempDir = path.dirname(finalOutputPath);
+        const listFile = path.join(tempDir, "copy_list.txt");
+
+        // Criar lista temporária (assumindo que os vídeos têm formatos compatíveis)
+        const listContent = `file '${recordedVideoPath}'`;
+        fs.writeFileSync(listFile, listContent);
+
+        const copyArgs = [
+          "-f",
+          "concat",
+          "-safe",
+          "0",
+          "-i",
+          listFile,
+          "-c",
+          "copy", // Copiar sem recodificar
+          "-y",
+          finalOutputPath,
+        ];
+
+        console.log("⚡ Comando copy:", copyArgs.join(" "));
+
+        const ffmpegProcess = spawn(ffmpegPath, copyArgs);
+        let stderr = "";
+
+        ffmpegProcess.stderr?.on("data", (data: Buffer) => {
+          const output = data.toString();
+          stderr += output;
+          console.log("⚡ Copy progresso:", output.trim());
+        });
+
+        ffmpegProcess.on("close", (code: number | null) => {
+          // Limpar arquivo temporário
+          if (fs.existsSync(listFile)) {
+            fs.unlinkSync(listFile);
+          }
+
+          if (code === 0) {
+            if (fs.existsSync(finalOutputPath)) {
+              const stats = fs.statSync(finalOutputPath);
+              resolve({
+                success: true,
+                outputPath: finalOutputPath,
+                message: "Copy realizado instantaneamente!",
+                fileSize: stats.size,
+                method: "copy-only",
+              });
+            } else {
+              reject(new Error("Arquivo copy não foi criado"));
+            }
+          } else {
+            reject(new Error(`Copy falhou: ${stderr.slice(-200)}`));
+          }
+        });
+
+        ffmpegProcess.on("error", (error: Error) => {
+          if (fs.existsSync(listFile)) {
+            fs.unlinkSync(listFile);
+          }
+          reject(new Error(`Erro copy: ${error.message}`));
+        });
+      });
+    },
+  );
+
+  // Handler para testar acesso do FFmpeg a URLs S3
+  ipcMain.handle(
+    "video-concat:test-s3-access",
+    async (
+      _event,
+      options: {
+        videoUrl: string;
+        testName: string;
+      },
+    ) => {
+      return new Promise((resolve) => {
+        const { videoUrl, testName } = options;
+
+        console.log(`🔍 === TESTE DE ACESSO S3 - ${testName} ===`);
+        console.log(`🔗 URL: ${videoUrl}`);
+
+        if (!ffmpegPath || !fs.existsSync(ffmpegPath)) {
+          resolve({
+            success: false,
+            error: "FFmpeg não disponível",
+            details: {
+              ffmpegPath,
+              exists: ffmpegPath ? fs.existsSync(ffmpegPath) : false,
+            },
+          });
+          return;
+        }
+
+        // Comando FFmpeg para testar apenas acesso à URL (sem processar)
+        const testArgs = [
+          "-hide_banner",
+          "-y",
+
+          // Configurações de rede
+          "-timeout",
+          "15000000", // 15 segundos
+          "-reconnect",
+          "1",
+          "-reconnect_at_eof",
+          "1",
+          "-user_agent",
+          "FFmpeg/ElectronApp",
+
+          // Input da URL S3
+          "-i",
+          videoUrl,
+
+          // Apenas extrair informações (não processar)
+          "-t",
+          "1", // Apenas 1 segundo
+          "-f",
+          "null",
+          "-",
+        ];
+
+        console.log(`🔧 Comando de teste: ${ffmpegPath} ${testArgs.join(" ")}`);
+
+        const testProcess = spawn(ffmpegPath, testArgs);
+        let stdout = "";
+        let stderr = "";
+
+        testProcess.stdout?.on("data", (data: Buffer) => {
+          stdout += data.toString();
+        });
+
+        testProcess.stderr?.on("data", (data: Buffer) => {
+          const output = data.toString();
+          stderr += output;
+          console.log(`📊 FFmpeg saída: ${output.trim()}`);
+        });
+
+        testProcess.on("close", (code: number | null) => {
+          console.log(`🏁 Teste finalizado com código: ${code}`);
+          console.log(`📋 Stderr completo: ${stderr}`);
+
+          const success = code === 0;
+          const videoInfo = extractVideoInfo(stderr);
+
+          resolve({
+            success,
+            exitCode: code,
+            stdout,
+            stderr: stderr.slice(-1000), // Últimas 1000 chars
+            videoInfo,
+            error: success ? null : "Falha no acesso via FFmpeg",
+            testName,
+          });
+        });
+
+        testProcess.on("error", (error: Error) => {
+          console.error(`❌ Erro no teste: ${error.message}`);
+          resolve({
+            success: false,
+            error: error.message,
+            details: { testName, videoUrl },
+            testName,
+          });
+        });
+      });
+    },
+  );
+
+  console.log("✅ Handlers OTIMIZADOS registrados!");
+}
+
+// Função para extrair informações do vídeo do stderr do FFmpeg
+function extractVideoInfo(stderr: string): any {
+  const info: any = {};
+
+  // Extrair duração
+  const durationMatch = stderr.match(/Duration: (\d{2}:\d{2}:\d{2}\.\d{2})/);
+  if (durationMatch) {
+    info.duration = durationMatch[1];
+  }
+
+  // Extrair resolução
+  const resolutionMatch = stderr.match(/(\d+x\d+)/);
+  if (resolutionMatch) {
+    info.resolution = resolutionMatch[1];
+  }
+
+  // Extrair codec de vídeo
+  const videoCodecMatch = stderr.match(/Video: (\w+)/);
+  if (videoCodecMatch) {
+    info.videoCodec = videoCodecMatch[1];
+  }
+
+  // Extrair codec de áudio
+  const audioCodecMatch = stderr.match(/Audio: (\w+)/);
+  if (audioCodecMatch) {
+    info.audioCodec = audioCodecMatch[1];
+  }
+
+  return info;
+}

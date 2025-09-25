@@ -2,75 +2,92 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 export interface HeaderConfig {
-	isEnabled: boolean;
-	height: number;
-	examName: string;
-	examDate: string;
-	patientName: string;
-	patientSex: "Masculino" | "Feminino" | "" | undefined;
-	patientAge: string;
-	institutionName: string;
-	requestingDoctor: string;
-	crm: string;
-	externalId: string;
-	id: number;
-	// Configurações de vídeo de introdução
-	includeIntroVideo: boolean;
+  isEnabled: boolean;
+  height: number;
+  examName: string;
+  examDate: string;
+  patientName: string;
+  patientSex: "Masculino" | "Feminino" | "" | undefined;
+  patientAge: string;
+  institutionName: string;
+  requestingDoctor: string;
+  crm: string;
+  externalId: string;
+  id: number;
+  // Configurações de vídeos S3
+  introVideo: {
+    key: string;
+    url: string;
+  };
+  outroVideo: {
+    key: string;
+    url: string;
+  };
+  // Configurações de vídeo de introdução (manter para compatibilidade)
+  includeIntroVideo: boolean;
 }
 
 export interface FooterConfig {
-	isEnabled: boolean;
-	height: number;
+  isEnabled: boolean;
+  height: number;
 }
 
 interface HeaderConfigStore {
-	headerConfig: HeaderConfig;
-	updateHeaderConfig: (config: Partial<HeaderConfig>) => void;
-	resetHeaderConfig: () => void;
-	footerConfig: FooterConfig;
-	updateFooterConfig: (config: Partial<FooterConfig>) => void;
-	resetFooterConfig: () => void;
+  headerConfig: HeaderConfig;
+  updateHeaderConfig: (config: Partial<HeaderConfig>) => void;
+  resetHeaderConfig: () => void;
+  footerConfig: FooterConfig;
+  updateFooterConfig: (config: Partial<FooterConfig>) => void;
+  resetFooterConfig: () => void;
 }
 
 const defaultHeaderConfig: HeaderConfig = {
-	isEnabled: true,
-	height: 80,
-	examName: "Ultrassonografia Abdominal",
-	examDate: "2025-07-05",
-	patientName: "Nome completo do paciente",
-	patientSex: "Masculino" as const,
-	patientAge: "35 anos",
-	institutionName: "Hospital São Jose",
-	requestingDoctor: "Nome do médico",
-	crm: "12345/SP",
-	externalId: "Código/ID",
-	id: 0,
-	includeIntroVideo: true,
+  isEnabled: true,
+  height: 80,
+  examName: "Ultrassonografia Abdominal",
+  examDate: "2025-07-05",
+  patientName: "Nome completo do paciente",
+  patientSex: "Masculino" as const,
+  patientAge: "35 anos",
+  institutionName: "",
+  requestingDoctor: "Nome do médico",
+  crm: "12345/SP",
+  externalId: "Código/ID",
+  id: 0,
+  introVideo: {
+    key: "",
+    url: "",
+  },
+  outroVideo: {
+    key: "",
+    url: "",
+  },
+  includeIntroVideo: true,
 };
 
 const defaultFooterConfig: FooterConfig = {
-	isEnabled: false,
-	height: 40,
+  isEnabled: false,
+  height: 40,
 };
 
 export const useHeaderConfigStore = create<HeaderConfigStore>()(
-	persist(
-		(set) => ({
-			headerConfig: defaultHeaderConfig,
-			updateHeaderConfig: (config) =>
-				set((state) => ({
-					headerConfig: { ...state.headerConfig, ...config },
-				})),
-			resetHeaderConfig: () => set({ headerConfig: defaultHeaderConfig }),
-			footerConfig: defaultFooterConfig,
-			updateFooterConfig: (config) =>
-				set((state) => ({
-					footerConfig: { ...state.footerConfig, ...config },
-				})),
-			resetFooterConfig: () => set({ footerConfig: defaultFooterConfig }),
-		}),
-		{
-			name: "header-config-storage",
-		},
-	),
+  persist(
+    (set) => ({
+      headerConfig: defaultHeaderConfig,
+      updateHeaderConfig: (config) =>
+        set((state) => ({
+          headerConfig: { ...state.headerConfig, ...config },
+        })),
+      resetHeaderConfig: () => set({ headerConfig: defaultHeaderConfig }),
+      footerConfig: defaultFooterConfig,
+      updateFooterConfig: (config) =>
+        set((state) => ({
+          footerConfig: { ...state.footerConfig, ...config },
+        })),
+      resetFooterConfig: () => set({ footerConfig: defaultFooterConfig }),
+    }),
+    {
+      name: "header-config-storage",
+    },
+  ),
 );

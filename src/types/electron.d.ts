@@ -1,13 +1,14 @@
 // Tipos para as APIs do Electron no renderer process
 
 interface ElectronAPI {
-    invoke(channel: string, ...args: any[]): Promise<any>;
-    on(channel: string, callback: (...args: any[]) => void): void;
-    removeAllListeners(channel: string): void;
+  invoke(channel: string, ...args: any[]): Promise<any>;
+  on(channel: string, callback: (...args: any[]) => void): void;
+  removeAllListeners(channel: string): void;
 }
 
 declare global {
-    interface Window {
-        electronAPI: ElectronAPI;
-    }
+  interface Window {
+    electronAPI: ElectronAPI;
+    electron: ElectronAPI; // Alias para compatibilidade
+  }
 }
