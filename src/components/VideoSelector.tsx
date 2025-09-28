@@ -93,61 +93,6 @@ export function VideoSelector({
         </div>
 
         {/* Status da configuração */}
-        <div className="mt-6 border-t border-gray-200 pt-4">
-          <div className="grid gap-4 text-sm md:grid-cols-2">
-            <div className="flex items-center space-x-2">
-              <div
-                className={`h-3 w-3 rounded-full ${
-                  introVideo.url ? "bg-green-500" : "bg-gray-300"
-                }`}
-              ></div>
-              <span
-                className={introVideo.url ? "text-green-700" : "text-gray-500"}
-              >
-                Vídeo de Introdução:{" "}
-                {introVideo.url ? "Configurado" : "Não selecionado"}
-              </span>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <div
-                className={`h-3 w-3 rounded-full ${
-                  outroVideo.url ? "bg-green-500" : "bg-gray-300"
-                }`}
-              ></div>
-              <span
-                className={outroVideo.url ? "text-green-700" : "text-gray-500"}
-              >
-                Vídeo de Encerramento:{" "}
-                {outroVideo.url ? "Configurado" : "Não selecionado"}
-              </span>
-            </div>
-          </div>
-
-          {introVideo.url && outroVideo.url && (
-            <div className="mt-4 rounded-md border border-green-200 bg-green-50 p-3">
-              <div className="flex items-center space-x-2">
-                <div className="h-4 w-4 text-green-600">✅</div>
-                <p className="text-sm text-green-800">
-                  <strong>Configuração completa!</strong> Os vídeos estão
-                  prontos para serem usados na concatenação.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {(!introVideo.url || !outroVideo.url) && (
-            <div className="mt-4 rounded-md border border-yellow-200 bg-yellow-50 p-3">
-              <div className="flex items-center space-x-2">
-                <div className="h-4 w-4 text-yellow-600">⚠️</div>
-                <p className="text-sm text-yellow-800">
-                  Selecione ambos os vídeos para utilizar a funcionalidade de
-                  concatenação.
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Informações adicionais */}

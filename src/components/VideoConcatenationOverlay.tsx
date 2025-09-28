@@ -1,7 +1,16 @@
 import React, { useState, useEffect } from "react";
-import { Loader2, Video, CheckCircle, AlertCircle, X } from "lucide-react";
+import {
+  Loader2,
+  Video,
+  CheckCircle,
+  AlertCircle,
+  X,
+  Upload,
+  Cloud,
+} from "lucide-react";
 import { useHeaderConfigStore } from "@/store/store-header-config";
 import { S3UrlValidator } from "@/helpers/s3-url-validator";
+import { useS3ConfigStore } from "@/store/store-s3-config";
 
 interface VideoConcatenationOverlayProps {
   isVisible: boolean;
@@ -16,6 +25,13 @@ interface ConcatenationState {
     success: boolean;
     message: string;
     outputPath?: string;
+  } | null;
+  isUploading: boolean;
+  uploadProgress: number;
+  uploadResult: {
+    success: boolean;
+    message: string;
+    s3Url?: string;
   } | null;
 }
 
@@ -90,10 +106,14 @@ export function VideoConcatenationOverlay({
   recordedVideoPath,
 }: VideoConcatenationOverlayProps) {
   const { headerConfig } = useHeaderConfigStore();
+  const { s3Config } = useS3ConfigStore();
   const [state, setState] = useState<ConcatenationState>({
     isProcessing: false,
     progress: "",
     result: null,
+    isUploading: false,
+    uploadProgress: 0,
+    uploadResult: null,
   });
 
   console.log("🎬 VideoConcatenationOverlay render:", {

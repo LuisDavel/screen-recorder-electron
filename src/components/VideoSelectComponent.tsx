@@ -96,38 +96,6 @@ export function VideoSelectComponent({
 
   return (
     <div className={`space-y-3 ${className}`}>
-      <div className="flex items-center justify-between">
-        <label className="block text-sm font-medium text-gray-700">
-          {label}
-        </label>
-
-        <button
-          onClick={handleReload}
-          disabled={loading}
-          className="flex items-center space-x-1 text-xs text-blue-600 hover:text-blue-800 disabled:opacity-50"
-        >
-          <span className={loading ? "animate-spin" : ""}>🔄</span>
-          <span>Recarregar</span>
-        </button>
-      </div>
-
-      {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 p-3">
-          <div className="flex items-start space-x-2">
-            <div className="mt-0.5 h-4 w-4 text-red-600">❌</div>
-            <div>
-              <p className="text-sm text-red-800">{error}</p>
-              <button
-                onClick={clearError}
-                className="mt-1 text-xs text-red-600 hover:text-red-800"
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="relative">
         <select
           value={selectedVideo}
@@ -155,37 +123,6 @@ export function VideoSelectComponent({
           Nenhum vídeo encontrado no bucket S3.
         </p>
       )}
-
-      {selectedVideo && (
-        <div className="rounded-md border border-blue-200 bg-blue-50 p-3">
-          <div className="flex items-start space-x-2">
-            <div className="mt-0.5 h-4 w-4 text-blue-600">✅</div>
-            <div className="flex-1">
-              <p className="text-sm text-blue-800">
-                <strong>Vídeo selecionado:</strong>{" "}
-                {videos.find((v) => v.key === selectedVideo)?.displayName}
-              </p>
-              {urlCache[selectedVideo] && (
-                <p className="mt-1 font-mono text-xs break-all text-blue-600">
-                  URL: {urlCache[selectedVideo].substring(0, 80)}...
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="text-xs text-gray-500">
-        <p>
-          <strong>Vídeos disponíveis:</strong> {videos.length} encontrados
-        </p>
-        {videos.length > 0 && (
-          <p className="mt-1">
-            <strong>Formatos aceitos:</strong> huc, intro, hsjb, cliniimagem,
-            hsj
-          </p>
-        )}
-      </div>
     </div>
   );
 }

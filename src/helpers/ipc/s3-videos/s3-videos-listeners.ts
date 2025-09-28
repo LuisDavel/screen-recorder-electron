@@ -43,7 +43,7 @@ interface S3UrlResult {
 
 // Mapeamento dos nomes dos vídeos
 const VIDEO_NAMES_MAP: { [key: string]: string } = {
-  huc: "HUC - Hospital da Universidade de Coimbra",
+  huc: "HUC - Hospital Unimed Criciuma",
   intro: "Vídeo de Introdução",
   hsjb: "HSJB - Hospital São João Batista",
   cliniimagem: "CliniImagem - Centro de Diagnóstico",
@@ -148,6 +148,7 @@ export function addS3VideosEventListeners(mainWindow: BrowserWindow) {
           videos: videos.map((v) => ({
             name: v.name,
             displayName: v.displayName,
+            id: v.key,
           })),
         });
 

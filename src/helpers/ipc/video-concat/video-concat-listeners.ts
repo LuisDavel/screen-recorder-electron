@@ -4,6 +4,262 @@ import path from "path";
 import fs from "fs";
 import ffmpegStatic from "ffmpeg-static";
 
+// Função para validar URL S3
+async function validateS3Url(url: string): Promise<boolean> {
+  try {
+    console.log("🔍 Validando URL S3...");
+    const response = await fetch(url, { method: "HEAD", timeout: 10000 });
+    const isValid = response.ok;
+    console.log(
+      `${isValid ? "✅" : "❌"} URL S3 ${isValid ? "válida" : "inválida"} (${response.status})`,
+    );
+    return isValid;
+  } catch (error) {
+    console.log(
+      "❌ URL S3 inválida:",
+      error instanceof Error ? error.message : String(error),
+    );
+    return false;
+  }
+}
+
+// Função para regenerar URL S3 expirada
+async function regenerateS3Url(expiredUrl: string): Promise<string | null> {
+  try {
+    console.log("🔄 Regenerando URL S3 expirada...", expiredUrl);
+
+    // Extrair informações da URL expirada
+    const urlObj = new URL(expiredUrl);
+    console.log("🔍 URL parsed:", {
+      hostname: urlObj.hostname,
+      pathname: urlObj.pathname,
+      search: urlObj.search,
+    });
+
+    const pathParts = urlObj.pathname
+      .split("/")
+      .filter((part) => part.length > 0);
+    console.log("🔍 Path parts:", pathParts);
+
+    // Para URLs S3, a chave pode estar em diferentes posições dependendo do formato
+    let videoKey = "";
+
+    if (pathParts.length >= 2) {
+      // Formato: bucket.s3.region.amazonaws.com/folder/file.mp4
+      // ou s3.amazonaws.com/bucket/folder/file.mp4
+      if (
+        urlObj.hostname.includes(".s3.") ||
+        urlObj.hostname.startsWith("s3.")
+      ) {
+        videoKey = pathParts.slice(-1)[0]; // Último elemento é o arquivo
+      } else {
+        videoKey = pathParts.slice(-1)[0]; // Último elemento é o arquivo
+      }
+    }
+
+    console.log("🔍 Video key extraída:", videoKey);
+
+    if (!videoKey || videoKey.length === 0) {
+      console.error("❌ Não foi possível extrair a chave do vídeo da URL");
+      console.error("❌ URL pathname:", urlObj.pathname);
+      console.error("❌ Path parts:", pathParts);
+      return null;
+    }
+
+    // Importar módulos necessários
+    const { useS3ConfigStore } = require("../../../store/store-s3-config");
+    const { S3Client, GetObjectCommand } = require("@aws-sdk/client-s3");
+    const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
+
+    const s3Config = useS3ConfigStore.getState().config;
+    console.log("🔍 Configuração S3:", {
+      isConfigured: s3Config.isConfigured,
+      bucketName: s3Config.bucketName,
+      region: s3Config.region,
+      folderPrefix: s3Config.folderPrefix,
+      hasAccessKey: !!s3Config.accessKeyId,
+      hasSecretKey: !!s3Config.secretAccessKey,
+    });
+
+    if (!s3Config.isConfigured) {
+      console.error("❌ Configuração S3 não está válida");
+      return null;
+    }
+
+    if (
+      !s3Config.accessKeyId ||
+      !s3Config.secretAccessKey ||
+      !s3Config.bucketName
+    ) {
+      console.error("❌ Credenciais S3 incompletas:", {
+        hasAccessKey: !!s3Config.accessKeyId,
+        hasSecretKey: !!s3Config.secretAccessKey,
+        hasBucket: !!s3Config.bucketName,
+      });
+      return null;
+    }
+
+    // Criar cliente S3
+    console.log("🔄 Criando cliente S3...");
+    const client = new S3Client({
+      credentials: {
+        accessKeyId: s3Config.accessKeyId,
+        secretAccessKey: s3Config.secretAccessKey,
+      },
+      region: s3Config.region,
+    });
+
+    // Construir chave completa
+    const fullKey = s3Config.folderPrefix
+      ? `${s3Config.folderPrefix}/${videoKey}`
+      : videoKey;
+    console.log("🔍 Chave completa do objeto:", fullKey);
+
+    const command = new GetObjectCommand({
+      Bucket: s3Config.bucketName,
+      Key: fullKey,
+    });
+
+    console.log("🔄 Gerando URL assinada...");
+    // Gerar nova URL com validade de 2 horas
+    const newUrl = await getSignedUrl(client, command, { expiresIn: 7200 });
+    console.log(
+      "✅ Nova URL S3 gerada com sucesso:",
+      newUrl.substring(0, 100) + "...",
+    );
+    return newUrl;
+  } catch (error) {
+    console.error("❌ Erro ao regenerar URL S3:", error);
+    return null;
+  }
+}
+
+// Função para validar e regenerar URLs S3 se necessário
+async function validateAndRegenerateUrls(
+  introUrl: string,
+  outroUrl: string,
+  mainWindow: BrowserWindow,
+): Promise<{ introUrl: string; outroUrl: string }> {
+  console.log("🔍 Validando URLs S3...");
+  mainWindow.webContents.send(
+    "video-concat:progress",
+    "🔍 Validando URLs S3...",
+  );
+
+  let validIntroUrl = introUrl;
+  let validOutroUrl = outroUrl;
+
+  // Validar URL de introdução
+  const introValid = await validateS3Url(introUrl);
+  if (!introValid) {
+    console.log("⚠️ URL de introdução inválida, tentando regenerar...");
+    mainWindow.webContents.send(
+      "video-concat:progress",
+      "⚠️ Regenerando URL de introdução...",
+    );
+    const newIntroUrl = await regenerateS3Url(introUrl);
+    if (newIntroUrl) {
+      validIntroUrl = newIntroUrl;
+      console.log("✅ URL de introdução regenerada com sucesso");
+    } else {
+      console.log(
+        "⚠️ Falha na regeneração, tentando continuar com URL original...",
+      );
+      mainWindow.webContents.send(
+        "video-concat:progress",
+        "⚠️ Usando URL original (pode falhar)...",
+      );
+      validIntroUrl = introUrl; // Fallback para URL original
+    }
+  }
+
+  // Validar URL de encerramento
+  const outroValid = await validateS3Url(outroUrl);
+  if (!outroValid) {
+    console.log("⚠️ URL de encerramento inválida, tentando regenerar...");
+    mainWindow.webContents.send(
+      "video-concat:progress",
+      "⚠️ Regenerando URL de encerramento...",
+    );
+    const newOutroUrl = await regenerateS3Url(outroUrl);
+    if (newOutroUrl) {
+      validOutroUrl = newOutroUrl;
+      console.log("✅ URL de encerramento regenerada com sucesso");
+    } else {
+      console.log(
+        "⚠️ Falha na regeneração, tentando continuar com URL original...",
+      );
+      mainWindow.webContents.send(
+        "video-concat:progress",
+        "⚠️ Usando URL original (pode falhar)...",
+      );
+      validOutroUrl = outroUrl; // Fallback para URL original
+    }
+  }
+
+  console.log("✅ URLs S3 validadas e prontas para uso");
+  return { introUrl: validIntroUrl, outroUrl: validOutroUrl };
+}
+
+// Função para lidar com upload automático para S3
+async function handleS3AutoUpload(filePath: string, mainWindow: BrowserWindow) {
+  try {
+    // Importar dinamicamente o helper de upload S3
+    const { uploadToS3 } = await import("../../s3-upload-helper");
+    const { useS3ConfigStore } = await import("../../../store/store-s3-config");
+
+    const s3Config = useS3ConfigStore.getState().config;
+
+    if (s3Config.isEnabled && s3Config.isConfigured) {
+      console.log("🚀 Iniciando upload automático para S3...");
+
+      // Enviar progresso para o renderer
+      mainWindow.webContents.send("video-concat:s3-upload-started", {
+        filePath,
+      });
+
+      const uploadResult = await uploadToS3(filePath, (progress) => {
+        // Enviar progresso do upload para o renderer
+        mainWindow.webContents.send(
+          "video-concat:s3-upload-progress",
+          progress,
+        );
+      });
+
+      if (uploadResult.success) {
+        console.log(
+          "✅ Upload automático para S3 concluído:",
+          uploadResult.s3Url,
+        );
+        mainWindow.webContents.send("video-concat:s3-upload-complete", {
+          success: true,
+          s3Url: uploadResult.s3Url,
+          uploadId: uploadResult.uploadId,
+        });
+      } else {
+        console.log(
+          "⚠️ Upload automático para S3 falhou:",
+          uploadResult.message,
+        );
+        mainWindow.webContents.send("video-concat:s3-upload-complete", {
+          success: false,
+          error: uploadResult.message,
+        });
+      }
+    } else {
+      console.log(
+        "ℹ️ Upload automático para S3 desabilitado ou não configurado",
+      );
+    }
+  } catch (s3Error) {
+    console.error("❌ Erro durante upload automático para S3:", s3Error);
+    mainWindow.webContents.send("video-concat:s3-upload-complete", {
+      success: false,
+      error: s3Error instanceof Error ? s3Error.message : String(s3Error),
+    });
+  }
+}
+
 // Função para encontrar o caminho correto do FFmpeg
 function getFFmpegPath(): string | null {
   console.log("🔍 ffmpeg-static retornou:", ffmpegStatic);
@@ -113,15 +369,24 @@ export function registerVideoConcatListeners(mainWindow: BrowserWindow) {
             outroVideoUrl ? "SIM (S3)" : "NÃO (demo)",
           );
 
+          // VALIDAÇÃO E REGENERAÇÃO DE URLs S3
+          const validatedUrls = await validateAndRegenerateUrls(
+            remoteVideoUrl1,
+            remoteVideoUrl2,
+            mainWindow,
+          );
+          const validIntroUrl = validatedUrls.introUrl;
+          const validOutroUrl = validatedUrls.outroUrl;
+
           // Verificar se todas as URLs estão definidas
-          if (!remoteVideoUrl1) {
+          if (!validIntroUrl) {
             const error = "URL do vídeo remoto 1 não está definida";
             console.error("❌", error);
             reject(new Error(error));
             return;
           }
 
-          if (!remoteVideoUrl2) {
+          if (!validOutroUrl) {
             const error = "URL do vídeo remoto 2 não está definida";
             console.error("❌", error);
             reject(new Error(error));
@@ -188,7 +453,7 @@ export function registerVideoConcatListeners(mainWindow: BrowserWindow) {
                 "-threads",
                 "2", // Limitar threads para não sobrecarregar
                 "-i",
-                remoteVideoUrl1,
+                validIntroUrl,
                 "-c:v",
                 "libx264",
                 "-c:a",
@@ -247,7 +512,7 @@ export function registerVideoConcatListeners(mainWindow: BrowserWindow) {
                 "-threads",
                 "2",
                 "-i",
-                remoteVideoUrl2,
+                validOutroUrl,
                 "-c:v",
                 "libx264",
                 "-c:a",
@@ -397,6 +662,7 @@ export function registerVideoConcatListeners(mainWindow: BrowserWindow) {
           // Tentar método demuxer primeiro (mais confiável)
           try {
             const result = await executeDemuxerConcat();
+            await handleS3AutoUpload(finalOutputPath, mainWindow);
             resolve(result);
           } catch (error) {
             console.log("⚠️ Método demuxer falhou, tentando método direto...");
@@ -408,11 +674,11 @@ export function registerVideoConcatListeners(mainWindow: BrowserWindow) {
               "-threads",
               "2", // Limitar uso de CPU
               "-i",
-              remoteVideoUrl1,
+              validIntroUrl,
               "-i",
               recordedVideoPath,
               "-i",
-              remoteVideoUrl2,
+              validOutroUrl,
               "-filter_complex",
               "[0:v][0:a][1:v][1:a][2:v][2:a]concat=n=3:v=1:a=1[outv][outa]",
               "-map",
@@ -438,6 +704,7 @@ export function registerVideoConcatListeners(mainWindow: BrowserWindow) {
                 preserveArgs,
                 "Simples 3 Vídeos",
               );
+              await handleS3AutoUpload(finalOutputPath, mainWindow);
               resolve(result);
             } catch (preserveError) {
               console.log("⚠️ Método simples falhou, tentando apenas vídeo...");
@@ -447,11 +714,11 @@ export function registerVideoConcatListeners(mainWindow: BrowserWindow) {
                 "-threads",
                 "1", // Mínimo de threads
                 "-i",
-                remoteVideoUrl1,
+                validIntroUrl,
                 "-i",
                 recordedVideoPath,
                 "-i",
-                remoteVideoUrl2,
+                validOutroUrl,
                 "-filter_complex",
                 "[0:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2[v0];" +
                   "[1:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2[v1];" +
@@ -475,6 +742,7 @@ export function registerVideoConcatListeners(mainWindow: BrowserWindow) {
                   simpleArgs,
                   "3 Vídeos Apenas Vídeo",
                 );
+                await handleS3AutoUpload(finalOutputPath, mainWindow);
                 resolve(result);
               } catch (simpleError) {
                 console.log(
@@ -490,7 +758,7 @@ export function registerVideoConcatListeners(mainWindow: BrowserWindow) {
                 // Primeiro: Intro + Gravado
                 const step1Args = [
                   "-i",
-                  remoteVideoUrl1,
+                  validIntroUrl,
                   "-i",
                   recordedVideoPath,
                   "-filter_complex",
@@ -520,7 +788,7 @@ export function registerVideoConcatListeners(mainWindow: BrowserWindow) {
                   "-i",
                   tempStep1,
                   "-i",
-                  remoteVideoUrl2,
+                  validOutroUrl,
                   "-filter_complex",
                   "[0:v][1:v]concat=n=2:v=1:a=0[outv]",
                   "-map",
@@ -549,6 +817,7 @@ export function registerVideoConcatListeners(mainWindow: BrowserWindow) {
                     "Etapa 2 - Adicionar Final",
                   );
                   cleanupTemp();
+                  await handleS3AutoUpload(finalOutputPath, mainWindow);
                   resolve(result);
                 } catch (copyError) {
                   cleanupTemp();
