@@ -10,8 +10,12 @@ function getFFmpegPath(): string | null {
     return ffmpegStatic;
   }
 
+  // Determinar extensão do executável baseado na plataforma
+  const isWindows = process.platform === "win32";
+  const exeName = isWindows ? "ffmpeg.exe" : "ffmpeg";
+
   const possiblePaths = [
-    path.join(process.cwd(), "node_modules", "ffmpeg-static", "ffmpeg"),
+    path.join(process.cwd(), "node_modules", "ffmpeg-static", exeName),
     path.join(
       __dirname,
       "..",
@@ -19,15 +23,15 @@ function getFFmpegPath(): string | null {
       "..",
       "node_modules",
       "ffmpeg-static",
-      "ffmpeg",
+      exeName,
     ),
     path.join(
       process.resourcesPath || process.cwd(),
       "node_modules",
       "ffmpeg-static",
-      "ffmpeg",
+      exeName,
     ),
-    "ffmpeg",
+    exeName,
   ];
 
   for (const testPath of possiblePaths) {
