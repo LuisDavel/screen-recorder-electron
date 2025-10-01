@@ -262,19 +262,68 @@ async function handleS3AutoUpload(filePath: string, mainWindow: BrowserWindow) {
 
 // Função para encontrar o caminho correto do FFmpeg
 function getFFmpegPath(): string | null {
-  console.log("🔍 ffmpeg-static retornou:", ffmpegStatic);
+  console.log("🔍 [Video Concat Listeners] Procurando FFmpeg...");
+  console.log(
+    "🔍 [Video Concat Listeners] ffmpeg-static retornou:",
+    ffmpegStatic,
+  );
+  console.log("🔍 [Video Concat Listeners] Platform:", process.platform);
+  console.log(
+    "🔍 [Video Concat Listeners] process.resourcesPath:",
+    process.resourcesPath,
+  );
+  console.log("🔍 [Video Concat Listeners] __dirname:", __dirname);
 
-  // Se ffmpeg-static retornou um caminho válido, usar ele
-  if (ffmpegStatic && fs.existsSync(ffmpegStatic)) {
-    console.log("✅ FFmpeg encontrado via ffmpeg-static:", ffmpegStatic);
-    return ffmpegStatic;
+  // Primeiro, tentar o caminho que ffmpeg-static retornou
+  if (ffmpegStatic) {
+    console.log(
+      "🔍 [Video Concat Listeners] Testando ffmpeg-static:",
+      ffmpegStatic,
+    );
+    if (fs.existsSync(ffmpegStatic)) {
+      console.log(
+        "✅ [Video Concat Listeners] FFmpeg encontrado via ffmpeg-static",
+      );
+      return ffmpegStatic;
+    }
+
+    // Se não existir, pode estar em app.asar.unpacked
+    const unpackedPath = ffmpegStatic.replace("app.asar", "app.asar.unpacked");
+    console.log("🔍 [Video Concat Listeners] Testando unpacked:", unpackedPath);
+    if (fs.existsSync(unpackedPath)) {
+      console.log(
+        "✅ [Video Concat Listeners] FFmpeg encontrado em app.asar.unpacked",
+      );
+      return unpackedPath;
+    }
   }
+
+  // Determinar extensão do executável baseado na plataforma
+  const isWindows = process.platform === "win32";
+  const exeName = isWindows ? "ffmpeg.exe" : "ffmpeg";
 
   // Caminhos alternativos para procurar o FFmpeg
   const possiblePaths = [
-    // Caminho direto no node_modules
-    path.join(process.cwd(), "node_modules", "ffmpeg-static", "ffmpeg"),
-    // Caminho no diretório do app (para produção)
+    // Caminhos para app empacotado
+    process.resourcesPath
+      ? path.join(
+          process.resourcesPath,
+          "app.asar.unpacked",
+          "node_modules",
+          "ffmpeg-static",
+          exeName,
+        )
+      : null,
+    process.resourcesPath
+      ? path.join(
+          process.resourcesPath,
+          "node_modules",
+          "ffmpeg-static",
+          exeName,
+        )
+      : null,
+    // Caminhos para desenvolvimento
+    path.join(process.cwd(), "node_modules", "ffmpeg-static", exeName),
     path.join(
       __dirname,
       "..",
@@ -282,25 +331,21 @@ function getFFmpegPath(): string | null {
       "..",
       "node_modules",
       "ffmpeg-static",
-      "ffmpeg",
+      exeName,
     ),
-    // Caminho relativo ao processo atual
-    path.join(
-      process.resourcesPath || process.cwd(),
-      "node_modules",
-      "ffmpeg-static",
-      "ffmpeg",
-    ),
-    // FFmpeg do sistema (se instalado)
-    "ffmpeg",
-  ];
+    // PATH do sistema
+    exeName,
+  ].filter(Boolean) as string[];
 
-  console.log("🔍 Procurando FFmpeg nos caminhos:", possiblePaths);
+  console.log("🔍 [Video Concat Listeners] Testando caminhos:", possiblePaths);
 
   for (const testPath of possiblePaths) {
-    console.log("🔍 Testando caminho:", testPath);
+    console.log("🔍 [Video Concat Listeners] Testando caminho:", testPath);
     if (fs.existsSync(testPath)) {
-      console.log("✅ FFmpeg encontrado em:", testPath);
+      console.log(
+        "✅ [Video Concat Listeners] FFmpeg encontrado em:",
+        testPath,
+      );
       return testPath;
     }
   }
@@ -310,13 +355,14 @@ function getFFmpegPath(): string | null {
 }
 
 // Obter o caminho correto do FFmpeg
-const ffmpegPath = getFFmpegPath();
+// Não definir ffmpegPath aqui - será chamado dinamicamente quando necessário
+// para garantir que os caminhos corretos sejam usados após o app inicializar
 
 export function registerVideoConcatListeners(mainWindow: BrowserWindow) {
   console.log("📡 INICIANDO registro de video concat listeners...");
   console.log("📡 MainWindow recebido:", !!mainWindow);
   console.log("📡 ipcMain disponível:", !!ipcMain);
-  console.log("📡 FFmpeg path detectado:", ffmpegPath);
+  console.log("📡 FFmpeg path detectado:", getFFmpegPath());
   console.log("📡 Process cwd:", process.cwd());
   console.log("📡 __dirname:", __dirname);
 
@@ -356,7 +402,7 @@ export function registerVideoConcatListeners(mainWindow: BrowserWindow) {
           const remoteVideoUrl2 = outroVideoUrl;
 
           console.log("🎬 Iniciando concatenação ROBUSTA com 3 vídeos...");
-          console.log("📍 FFmpeg path:", ffmpegPath);
+          console.log("📍 FFmpeg path será obtido dinamicamente...");
           console.log("🌐 Vídeo remoto 1 (início):", remoteVideoUrl1);
           console.log(
             "🌐 Vídeo é do S3?",
@@ -393,7 +439,13 @@ export function registerVideoConcatListeners(mainWindow: BrowserWindow) {
             return;
           }
 
-          // Verificar se FFmpeg está disponível
+          // Verificar se FFmpeg está disponível - obter caminho dinamicamente
+          const ffmpegPath = getFFmpegPath();
+          console.log(
+            "🎬 [Video Concat Listeners] FFmpeg path obtido:",
+            ffmpegPath,
+          );
+
           if (!ffmpegPath) {
             const error =
               "FFmpeg não está disponível (ffmpeg-static retornou null)";
@@ -840,6 +892,9 @@ export function registerVideoConcatListeners(mainWindow: BrowserWindow) {
     ipcMain.handle("video-concat:check-ffmpeg", async () => {
       try {
         console.log("🔍 Verificando FFmpeg...");
+
+        // Obter caminho do FFmpeg dinamicamente
+        const ffmpegPath = getFFmpegPath();
         console.log("🔍 FFmpeg path:", ffmpegPath);
 
         if (!ffmpegPath) {
@@ -987,6 +1042,10 @@ export function registerVideoConcatListeners(mainWindow: BrowserWindow) {
             "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WhatCarCanYouGetForAGrand.mp4";
           const outputPath =
             options.outputPath || "/tmp/test-first-video-only.mp4";
+
+          // Obter caminho do FFmpeg dinamicamente
+          const ffmpegPath = getFFmpegPath();
+          console.log("🎬 [Test First Video] FFmpeg path obtido:", ffmpegPath);
 
           if (!ffmpegPath) {
             reject(new Error("FFmpeg não disponível"));

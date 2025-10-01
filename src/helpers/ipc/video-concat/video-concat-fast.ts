@@ -6,12 +6,59 @@ import ffmpegStatic from "ffmpeg-static";
 
 // Função para encontrar o caminho correto do FFmpeg
 function getFFmpegPath(): string | null {
-  if (ffmpegStatic && fs.existsSync(ffmpegStatic)) {
-    return ffmpegStatic;
+  console.log("🔍 [Video Concat Fast] Procurando FFmpeg...");
+  console.log("🔍 [Video Concat Fast] ffmpeg-static retornou:", ffmpegStatic);
+  console.log("🔍 [Video Concat Fast] Platform:", process.platform);
+  console.log(
+    "🔍 [Video Concat Fast] process.resourcesPath:",
+    process.resourcesPath,
+  );
+  console.log("🔍 [Video Concat Fast] __dirname:", __dirname);
+
+  // Primeiro, tentar o caminho que ffmpeg-static retornou
+  if (ffmpegStatic) {
+    console.log("🔍 [Video Concat Fast] Testando ffmpeg-static:", ffmpegStatic);
+    if (fs.existsSync(ffmpegStatic)) {
+      console.log("✅ [Video Concat Fast] FFmpeg encontrado via ffmpeg-static");
+      return ffmpegStatic;
+    }
+
+    // Se não existir, pode estar em app.asar.unpacked
+    const unpackedPath = ffmpegStatic.replace("app.asar", "app.asar.unpacked");
+    console.log("🔍 [Video Concat Fast] Testando unpacked:", unpackedPath);
+    if (fs.existsSync(unpackedPath)) {
+      console.log(
+        "✅ [Video Concat Fast] FFmpeg encontrado em app.asar.unpacked",
+      );
+      return unpackedPath;
+    }
   }
 
+  // Determinar extensão do executável baseado na plataforma
+  const isWindows = process.platform === "win32";
+  const exeName = isWindows ? "ffmpeg.exe" : "ffmpeg";
+
   const possiblePaths = [
-    path.join(process.cwd(), "node_modules", "ffmpeg-static", "ffmpeg"),
+    // Caminhos para app empacotado
+    process.resourcesPath
+      ? path.join(
+          process.resourcesPath,
+          "app.asar.unpacked",
+          "node_modules",
+          "ffmpeg-static",
+          exeName,
+        )
+      : null,
+    process.resourcesPath
+      ? path.join(
+          process.resourcesPath,
+          "node_modules",
+          "ffmpeg-static",
+          exeName,
+        )
+      : null,
+    // Caminhos para desenvolvimento
+    path.join(process.cwd(), "node_modules", "ffmpeg-static", exeName),
     path.join(
       __dirname,
       "..",
@@ -19,27 +66,30 @@ function getFFmpegPath(): string | null {
       "..",
       "node_modules",
       "ffmpeg-static",
-      "ffmpeg",
+      exeName,
     ),
-    path.join(
-      process.resourcesPath || process.cwd(),
-      "node_modules",
-      "ffmpeg-static",
-      "ffmpeg",
-    ),
-    "ffmpeg",
-  ];
+    // PATH do sistema
+    exeName,
+  ].filter(Boolean) as string[];
+
+  console.log("🔍 [Video Concat Fast] Testando caminhos:", possiblePaths);
 
   for (const testPath of possiblePaths) {
+    console.log("🔍 [Video Concat Fast] Testando:", testPath);
     if (fs.existsSync(testPath)) {
+      console.log("✅ [Video Concat Fast] FFmpeg encontrado:", testPath);
       return testPath;
     }
   }
 
+  console.error(
+    "❌ [Video Concat Fast] FFmpeg não encontrado em nenhum caminho",
+  );
   return null;
 }
 
-const ffmpegPath = getFFmpegPath();
+// Não definir ffmpegPath aqui - será chamado dinamicamente quando necessário
+// para garantir que os caminhos corretos sejam usados após o app inicializar
 
 // Função para extrair nome do vídeo da URL S3
 function extractVideoName(url: string): string {
@@ -99,8 +149,22 @@ export function registerFastVideoConcatListeners(mainWindow: BrowserWindow) {
         console.log(`   📄 Caminho: ${recordedVideoPath}`);
         console.log("🚀 Iniciando concatenação sequencial otimizada...");
 
+        // Obter caminho do FFmpeg dinamicamente
+        const ffmpegPath = getFFmpegPath();
+        console.log("🎬 [Video Concat Fast] FFmpeg path obtido:", ffmpegPath);
+
         if (!ffmpegPath || !fs.existsSync(ffmpegPath)) {
-          reject(new Error("FFmpeg não disponível"));
+          console.error("❌ [Video Concat Fast] FFmpeg não disponível");
+          console.error("❌ [Video Concat Fast] ffmpegPath:", ffmpegPath);
+          console.error(
+            "❌ [Video Concat Fast] fs.existsSync:",
+            ffmpegPath ? fs.existsSync(ffmpegPath) : "N/A",
+          );
+          reject(
+            new Error(
+              "FFmpeg não disponível. Verifique os logs do console para mais detalhes.",
+            ),
+          );
           return;
         }
 
