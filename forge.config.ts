@@ -10,13 +10,14 @@ import { VitePlugin } from "@electron-forge/plugin-vite";
 import { FusesPlugin } from "@electron-forge/plugin-fuses";
 import { AutoUnpackNativesPlugin } from "@electron-forge/plugin-auto-unpack-natives";
 import { FuseV1Options, FuseVersion } from "@electron/fuses";
+import * as path from "path";
+import * as fs from "fs";
 
 const config: ForgeConfig = {
   packagerConfig: {
     asar: {
-      unpack: "**/{*.{node,dll,exe,dylib,so},ffmpeg-static}",
+      unpack: "**/node_modules/ffmpeg-static/**",
     },
-    extraResource: ["./node_modules/ffmpeg-static/ffmpeg*"],
     protocols: [
       {
         name: "Video Recorder",
@@ -156,6 +157,78 @@ const config: ForgeConfig = {
       [FuseV1Options.OnlyLoadAppFromAsar]: true,
     }),
   ],
+  hooks: {
+    postPackage: async (forgeConfig, options) => {
+      console.log(
+        `\n🔧 [postPackage] Platform: ${options.platform}, Arch: ${options.arch}`,
+      );
+
+      // Copiar o ffmpeg para resources
+      if (options.platform === "win32") {
+        console.log("📥 [postPackage] Preparando FFmpeg para Windows...");
+
+        const resourcesPath = path.join(options.outputPaths[0], "resources");
+        const ffmpegDestPath = path.join(resourcesPath, "ffmpeg.exe");
+
+        console.log(`📁 [postPackage] Resources path: ${resourcesPath}`);
+        console.log(`📁 [postPackage] FFmpeg dest: ${ffmpegDestPath}`);
+
+        // Verificar se já existe um ffmpeg.exe baixado no cache
+        const cachedFfmpegPath = path.join(
+          process.cwd(),
+          ".cache",
+          "ffmpeg-win32-x64.exe",
+        );
+
+        try {
+          // Se não existe no cache, baixar
+          if (!fs.existsSync(cachedFfmpegPath)) {
+            console.log(`📥 [postPackage] Baixando FFmpeg para Windows...`);
+
+            // Criar diretório cache se não existir
+            const cacheDir = path.dirname(cachedFfmpegPath);
+            if (!fs.existsSync(cacheDir)) {
+              fs.mkdirSync(cacheDir, { recursive: true });
+            }
+
+            // Executar script de download
+            const { execSync } = require("child_process");
+            execSync(
+              `node scripts/download-ffmpeg-win.js "${cachedFfmpegPath}"`,
+              {
+                stdio: "inherit",
+                cwd: process.cwd(),
+              },
+            );
+          } else {
+            console.log(
+              `✅ [postPackage] Usando FFmpeg em cache: ${cachedFfmpegPath}`,
+            );
+          }
+
+          // Copiar do cache para resources
+          fs.copyFileSync(cachedFfmpegPath, ffmpegDestPath);
+          console.log(`✅ [postPackage] FFmpeg copiado com sucesso!`);
+
+          // Verificar se o arquivo existe
+          if (fs.existsSync(ffmpegDestPath)) {
+            const stats = fs.statSync(ffmpegDestPath);
+            console.log(
+              `✅ [postPackage] Arquivo criado: ${(stats.size / 1024 / 1024).toFixed(2)} MB`,
+            );
+          } else {
+            console.error(`❌ [postPackage] Arquivo não foi criado!`);
+          }
+        } catch (error) {
+          console.error(`❌ [postPackage] Erro ao preparar FFmpeg:`, error);
+        }
+      } else {
+        console.log(
+          `ℹ️ [postPackage] Não é Windows, pulando preparação do FFmpeg`,
+        );
+      }
+    },
+  },
 };
 
 export default config;

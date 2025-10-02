@@ -37,7 +37,9 @@ function getFFmpegPath(): string | null {
   const exeName = isWindows ? "ffmpeg.exe" : "ffmpeg";
 
   const possiblePaths = [
-    // Caminhos para app empacotado
+    // PRIMEIRO: Caminho onde copiamos o ffmpeg.exe no postPackage hook
+    process.resourcesPath ? path.join(process.resourcesPath, exeName) : null,
+    // Caminhos para app empacotado (ffmpeg-static)
     process.resourcesPath
       ? path.join(
           process.resourcesPath,
