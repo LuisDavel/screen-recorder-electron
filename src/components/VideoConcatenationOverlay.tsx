@@ -106,7 +106,7 @@ export function VideoConcatenationOverlay({
   recordedVideoPath,
 }: VideoConcatenationOverlayProps) {
   const { headerConfig } = useHeaderConfigStore();
-  const { s3Config } = useS3ConfigStore();
+  const { config: s3Config } = useS3ConfigStore();
   const [state, setState] = useState<ConcatenationState>({
     isProcessing: false,
     progress: "",
@@ -139,10 +139,20 @@ export function VideoConcatenationOverlay({
       });
     }
 
-    // Configurar listener de progresso
+    // Configurar listener de progresso da concatenação
     if (window.videoConcatAPI) {
       window.videoConcatAPI.onProgress((progress: string) => {
         setState((prev) => ({ ...prev, progress }));
+      });
+    }
+
+    // Configurar listeners de progresso do upload S3
+    if (window.s3Upload) {
+      window.s3Upload.onProgress((_event: any, progress: any) => {
+        setState((prev) => ({
+          ...prev,
+          uploadProgress: progress.percentage,
+        }));
       });
     }
 
@@ -150,6 +160,9 @@ export function VideoConcatenationOverlay({
     return () => {
       if (window.videoConcatAPI) {
         window.videoConcatAPI.removeProgressListener();
+      }
+      if (window.s3Upload) {
+        window.s3Upload.removeAllListeners();
       }
     };
   }, [isVisible, recordedVideoPath]);
@@ -197,7 +210,7 @@ export function VideoConcatenationOverlay({
 
       setState((prev) => ({
         ...prev,
-        progress: "🚀 Iniciando concatenação sequencial (4 etapas)...",
+        progress: "🚀 Iniciando concatenação sequencial (5 etapas)...",
       }));
 
       // USAR MÉTODO SIMPLES (demuxer) - mais confiável que filter_complex
@@ -217,6 +230,52 @@ export function VideoConcatenationOverlay({
           outputPath: result.outputPath,
         },
       }));
+
+      // Se concatenação foi bem-sucedida e S3 está configurado, fazer upload
+      if (result.success && result.outputPath && s3Config.isConfigured) {
+        console.log("📤 Iniciando upload do vídeo concatenado para S3...");
+
+        setState((prev) => ({
+          ...prev,
+          isUploading: true,
+          uploadProgress: 0,
+        }));
+
+        try {
+          const uploadResult = await window.s3Upload.uploadFile(
+            result.outputPath,
+            {
+              accessKeyId: s3Config.accessKeyId!,
+              secretAccessKey: s3Config.secretAccessKey!,
+              region: s3Config.region,
+              bucketName: s3Config.bucketName,
+              folderPrefix: s3Config.folderPrefix,
+            },
+          );
+
+          console.log("✅ Upload concluído:", uploadResult);
+
+          setState((prev) => ({
+            ...prev,
+            isUploading: false,
+            uploadResult: {
+              success: uploadResult.success,
+              message: uploadResult.message,
+              s3Url: uploadResult.s3Url,
+            },
+          }));
+        } catch (uploadError) {
+          console.error("❌ Erro no upload:", uploadError);
+          setState((prev) => ({
+            ...prev,
+            isUploading: false,
+            uploadResult: {
+              success: false,
+              message: `Erro no upload: ${uploadError instanceof Error ? uploadError.message : String(uploadError)}`,
+            },
+          }));
+        }
+      }
     } catch (error) {
       console.error("❌ Ambos os métodos falharam:", error);
       setState((prev) => ({
@@ -235,6 +294,9 @@ export function VideoConcatenationOverlay({
       isProcessing: false,
       progress: "",
       result: null,
+      isUploading: false,
+      uploadProgress: 0,
+      uploadResult: null,
     });
     onClose();
   };
@@ -312,21 +374,45 @@ export function VideoConcatenationOverlay({
             </div>
           )}
 
-          {state.isProcessing ? (
+          {state.isProcessing || state.isUploading ? (
             // Loading State
             <div className="text-center">
               <div className="mb-4 flex justify-center">
-                <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
+                {state.isUploading ? (
+                  <Upload className="h-12 w-12 animate-bounce text-blue-500" />
+                ) : (
+                  <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
+                )}
               </div>
               <h4 className="mb-2 text-lg font-medium text-gray-900">
-                Processando Vídeo
+                {state.isUploading ? "Enviando para S3" : "Processando Vídeo"}
               </h4>
               <p className="mb-4 text-gray-600">
-                Combinando seu vídeo com o vídeo introdutório...
+                {state.isUploading
+                  ? "Fazendo upload do vídeo concatenado para o bucket S3..."
+                  : "Combinando seu vídeo com o vídeo introdutório..."}
               </p>
 
-              {/* Progress */}
-              {state.progress && (
+              {/* Progress de upload S3 */}
+              {state.isUploading && state.uploadProgress > 0 && (
+                <div className="mb-4">
+                  <div className="mb-2 flex items-center justify-between text-sm">
+                    <span className="text-gray-600">Progresso do Upload</span>
+                    <span className="font-medium text-blue-600">
+                      {state.uploadProgress}%
+                    </span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                    <div
+                      className="h-full bg-blue-500 transition-all duration-300"
+                      style={{ width: `${state.uploadProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Progress de concatenação */}
+              {!state.isUploading && state.progress && (
                 <div className="mb-4 rounded-lg bg-gray-100 p-3">
                   <div className="max-h-20 overflow-y-auto font-mono text-xs text-gray-600">
                     {state.progress.split("\n").slice(-3).join("\n")}
@@ -335,7 +421,9 @@ export function VideoConcatenationOverlay({
               )}
 
               <div className="text-sm text-gray-500">
-                Este processo pode levar alguns minutos...
+                {state.isUploading
+                  ? "Aguarde enquanto enviamos o arquivo..."
+                  : "Este processo pode levar alguns minutos..."}
               </div>
             </div>
           ) : state.result ? (
@@ -366,13 +454,57 @@ export function VideoConcatenationOverlay({
               </p>
 
               {state.result.success && state.result.outputPath && (
-                <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3">
-                  <p className="text-sm text-green-800">
-                    <strong>Arquivo salvo em:</strong>
-                  </p>
-                  <p className="font-mono text-xs break-all text-green-600">
-                    {state.result.outputPath}
-                  </p>
+                <div className="mb-4 space-y-3">
+                  <div className="rounded-lg border border-green-200 bg-green-50 p-3">
+                    <p className="text-sm text-green-800">
+                      <strong>Arquivo local salvo em:</strong>
+                    </p>
+                    <p className="font-mono text-xs break-all text-green-600">
+                      {state.result.outputPath}
+                    </p>
+                  </div>
+
+                  {/* Resultado do upload S3 */}
+                  {state.uploadResult && (
+                    <div
+                      className={`rounded-lg border p-3 ${
+                        state.uploadResult.success
+                          ? "border-blue-200 bg-blue-50"
+                          : "border-yellow-200 bg-yellow-50"
+                      }`}
+                    >
+                      <div className="flex items-start gap-2">
+                        {state.uploadResult.success ? (
+                          <Cloud className="mt-0.5 h-5 w-5 text-blue-600" />
+                        ) : (
+                          <AlertCircle className="mt-0.5 h-5 w-5 text-yellow-600" />
+                        )}
+                        <div className="flex-1">
+                          <p
+                            className={`text-sm font-medium ${
+                              state.uploadResult.success
+                                ? "text-blue-900"
+                                : "text-yellow-900"
+                            }`}
+                          >
+                            {state.uploadResult.success
+                              ? "✅ Upload para S3 concluído!"
+                              : "⚠️ Upload para S3 falhou"}
+                          </p>
+                          {state.uploadResult.s3Url && (
+                            <p className="mt-1 font-mono text-xs break-all text-blue-600">
+                              {state.uploadResult.s3Url}
+                            </p>
+                          )}
+                          {!state.uploadResult.success && (
+                            <p className="mt-1 text-xs text-yellow-700">
+                              {state.uploadResult.message}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

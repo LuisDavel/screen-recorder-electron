@@ -418,7 +418,99 @@ export function registerSimpleVideoConcatListeners(mainWindow: BrowserWindow) {
           });
         };
 
+        // Função para baixar arquivo do S3
+        const downloadS3File = async (
+          url: string,
+          destPath: string,
+        ): Promise<void> => {
+          const https = require("https");
+          const fs = require("fs");
+
+          return new Promise((resolveDownload, rejectDownload) => {
+            const file = fs.createWriteStream(destPath);
+
+            https
+              .get(url, (response: any) => {
+                if (
+                  response.statusCode === 302 ||
+                  response.statusCode === 301
+                ) {
+                  // Seguir redirect
+                  file.close();
+                  fs.unlinkSync(destPath);
+                  return downloadS3File(response.headers.location, destPath)
+                    .then(resolveDownload)
+                    .catch(rejectDownload);
+                }
+
+                if (response.statusCode !== 200) {
+                  file.close();
+                  fs.unlinkSync(destPath);
+                  return rejectDownload(
+                    new Error(
+                      `Download falhou: ${response.statusCode} ${response.statusMessage}`,
+                    ),
+                  );
+                }
+
+                const totalBytes = parseInt(
+                  response.headers["content-length"],
+                  10,
+                );
+                let downloadedBytes = 0;
+
+                response.on("data", (chunk: Buffer) => {
+                  downloadedBytes += chunk.length;
+                  const percent = totalBytes
+                    ? ((downloadedBytes / totalBytes) * 100).toFixed(1)
+                    : "?";
+                  mainWindow.webContents.send(
+                    "video-concat:progress",
+                    `📥 Baixando: ${percent}% (${(downloadedBytes / 1024 / 1024).toFixed(1)}MB)`,
+                  );
+                });
+
+                response.pipe(file);
+
+                file.on("finish", () => {
+                  file.close();
+                  resolveDownload();
+                });
+
+                file.on("error", (err: Error) => {
+                  fs.unlink(destPath, () => {});
+                  rejectDownload(err);
+                });
+              })
+              .on("error", (err: Error) => {
+                fs.unlink(destPath, () => {});
+                rejectDownload(err);
+              });
+          });
+        };
+
         try {
+          // ETAPA 0: Baixar vídeos do S3
+          const tempIntroS3 = path.join(tempDir, "temp_intro_s3.mp4");
+          const tempOutroS3 = path.join(tempDir, "temp_outro_s3.mp4");
+
+          console.log("📥 ETAPA 0/5: Baixando vídeos do S3...");
+          mainWindow.webContents.send(
+            "video-concat:progress",
+            "📥 Etapa 0/5: Baixando introdução do S3...",
+          );
+
+          await downloadS3File(validIntroUrl, tempIntroS3);
+          console.log("✅ Introdução baixada:", tempIntroS3);
+
+          mainWindow.webContents.send(
+            "video-concat:progress",
+            "📥 Etapa 0/5: Baixando encerramento do S3...",
+          );
+
+          await downloadS3File(validOutroUrl, tempOutroS3);
+          console.log("✅ Encerramento baixado:", tempOutroS3);
+
           // Configurações padrão de normalização para TODOS os vídeos
           const normalizeSettings = [
             "-c:v",
@@ -444,26 +536,18 @@ export function registerSimpleVideoConcatListeners(mainWindow: BrowserWindow) {
           ];
 
           // ETAPA 1: Normalizar vídeo de introdução
-          console.log("🔄 ETAPA 1/4: Normalizando introdução...");
+          console.log("🔄 ETAPA 1/5: Normalizando introdução...");
           mainWindow.webContents.send(
             "video-concat:progress",
-            "🔄 Etapa 1/4: Normalizando introdução...",
+            "🔄 Etapa 1/5: Normalizando introdução...",
           );
 
           const introArgs = [
             "-hide_banner",
             "-threads",
             "0",
-            "-timeout",
-            "60000000",
-            "-reconnect",
-            "1",
-            "-reconnect_at_eof",
-            "1",
-            "-user_agent",
-            "FFmpeg/ElectronApp",
             "-i",
-            validIntroUrl,
+            tempIntroS3, // Usar arquivo local baixado
             ...normalizeSettings,
             "-y",
             tempIntro,
@@ -472,10 +556,10 @@ export function registerSimpleVideoConcatListeners(mainWindow: BrowserWindow) {
           await execFFmpeg(introArgs, "Normalizar Introdução");
 
           // ETAPA 2: Normalizar vídeo gravado
-          console.log("🔄 ETAPA 2/4: Normalizando vídeo gravado...");
+          console.log("🔄 ETAPA 2/5: Normalizando vídeo gravado...");
           mainWindow.webContents.send(
             "video-concat:progress",
-            "🔄 Etapa 2/4: Normalizando gravação...",
+            "🔄 Etapa 2/5: Normalizando gravação...",
           );
 
           const recordedArgs = [
@@ -492,26 +576,18 @@ export function registerSimpleVideoConcatListeners(mainWindow: BrowserWindow) {
           await execFFmpeg(recordedArgs, "Normalizar Gravado");
 
           // ETAPA 3: Normalizar vídeo de encerramento
-          console.log("🔄 ETAPA 3/4: Normalizando encerramento...");
+          console.log("🔄 ETAPA 3/5: Normalizando encerramento...");
           mainWindow.webContents.send(
             "video-concat:progress",
-            "🔄 Etapa 3/4: Normalizando encerramento...",
+            "🔄 Etapa 3/5: Normalizando encerramento...",
           );
 
           const outroArgs = [
             "-hide_banner",
             "-threads",
             "0",
-            "-timeout",
-            "60000000",
-            "-reconnect",
-            "1",
-            "-reconnect_at_eof",
-            "1",
-            "-user_agent",
-            "FFmpeg/ElectronApp",
             "-i",
-            validOutroUrl,
+            tempOutroS3, // Usar arquivo local baixado
             ...normalizeSettings,
             "-y",
             tempOutro,
@@ -520,10 +596,10 @@ export function registerSimpleVideoConcatListeners(mainWindow: BrowserWindow) {
           await execFFmpeg(outroArgs, "Normalizar Encerramento");
 
           // ETAPA 4: Concatenar usando file list (método demuxer)
-          console.log("🔄 ETAPA 4/4: Concatenando com demuxer...");
+          console.log("🔄 ETAPA 4/5: Concatenando com demuxer...");
           mainWindow.webContents.send(
             "video-concat:progress",
-            "🔄 Etapa 4/4: Concatenando arquivos...",
+            "🔄 Etapa 4/5: Concatenando arquivos...",
           );
 
           // Criar lista de arquivos
@@ -574,7 +650,14 @@ export function registerSimpleVideoConcatListeners(mainWindow: BrowserWindow) {
           reject(error);
         } finally {
           // Limpar arquivos temporários
-          [tempIntro, tempRecorded, tempOutro, listFile].forEach((file) => {
+          [
+            tempIntro,
+            tempRecorded,
+            tempOutro,
+            tempIntroS3,
+            tempOutroS3,
+            listFile,
+          ].forEach((file) => {
             if (fs.existsSync(file)) {
               try {
                 fs.unlinkSync(file);
