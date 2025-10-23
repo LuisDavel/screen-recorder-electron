@@ -16,24 +16,18 @@ export function VideoSelectComponent({
   placeholder = "Selecione um vídeo...",
   className = "",
 }: VideoSelectProps) {
-  const {
-    videos,
-    loading,
-    error,
-    s3Config,
-    loadVideos,
-    getVideoUrl,
-    clearError,
-  } = useS3Videos();
+  const { videos, loading, error, loadVideos, getVideoUrl, clearError } =
+    useS3Videos();
 
   const [urlCache, setUrlCache] = useState<{ [key: string]: string }>({});
   console.log(urlCache);
-  // Carregar vídeos quando o componente montar ou a configuração S3 mudar
+
+  // Carregar vídeos quando o componente montar
   useEffect(() => {
-    if (s3Config && videos.length === 0 && !loading && !error) {
+    if (videos.length === 0 && !loading && !error) {
       loadVideos();
     }
-  }, [s3Config]);
+  }, []);
 
   // Lidar com mudança de seleção
   const handleVideoChange = useCallback(
@@ -75,24 +69,6 @@ export function VideoSelectComponent({
     setUrlCache({});
     loadVideos();
   }, [loadVideos, clearError]);
-
-  if (!s3Config) {
-    return (
-      <div
-        className={`rounded-lg border border-yellow-200 bg-yellow-50 p-4 ${className}`}
-      >
-        <div className="flex items-center space-x-2">
-          <div className="h-5 w-5 text-yellow-600">⚠️</div>
-          <div>
-            <h3 className="font-medium text-yellow-800">{label}</h3>
-            <p className="mt-1 text-sm text-yellow-700">
-              Configure suas credenciais AWS para ver os vídeos disponíveis.
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className={`space-y-3 ${className}`}>

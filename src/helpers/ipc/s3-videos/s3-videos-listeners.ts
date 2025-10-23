@@ -11,6 +11,17 @@ import {
   S3_VIDEOS_GET_URL_CHANNEL,
 } from "./s3-videos-channels";
 
+// Configuração fixa para bucket de assets (vídeos de intro/outro)
+// Esta configuração NÃO deve vir do usuário - é hardcoded
+const ASSETS_BUCKET_CONFIG = {
+  // TODO: Adicionar as credenciais corretas do bucket de assets
+  accessKeyId: process.env.AWS_ASSETS_ACCESS_KEY_ID || "",
+  secretAccessKey: process.env.AWS_ASSETS_SECRET_ACCESS_KEY || "",
+  region: process.env.AWS_ASSETS_REGION || "us-east-1",
+  bucketName: process.env.AWS_ASSETS_BUCKET_NAME || "cardiopicreport",
+  folderPrefix: "assets", // Pasta fixa onde ficam os vídeos de intro/outro
+} as const;
+
 interface S3Config {
   accessKeyId: string;
   secretAccessKey: string;
@@ -53,23 +64,23 @@ const VIDEO_NAMES_MAP: { [key: string]: string } = {
 export function addS3VideosEventListeners(mainWindow: BrowserWindow) {
   ProductionLogger.log("INFO", "Registrando listeners S3 videos...");
 
-  // Listar vídeos disponíveis
+  // Listar vídeos disponíveis (SEMPRE usa configuração fixa do bucket assets)
   ipcMain.handle(
     S3_VIDEOS_LIST_CHANNEL,
-    async (event, s3Config: S3Config): Promise<S3VideosResult> => {
+    async (event): Promise<S3VideosResult> => {
       try {
-        ProductionLogger.log("INFO", "Listando vídeos S3", {
-          bucketName: s3Config.bucketName,
-          folderPrefix: s3Config.folderPrefix,
+        ProductionLogger.log("INFO", "Listando vídeos S3 do bucket assets", {
+          bucketName: ASSETS_BUCKET_CONFIG.bucketName,
+          folderPrefix: ASSETS_BUCKET_CONFIG.folderPrefix,
         });
 
         // Validar configuração
         if (
-          !s3Config.accessKeyId ||
-          !s3Config.secretAccessKey ||
-          !s3Config.bucketName
+          !ASSETS_BUCKET_CONFIG.accessKeyId ||
+          !ASSETS_BUCKET_CONFIG.secretAccessKey ||
+          !ASSETS_BUCKET_CONFIG.bucketName
         ) {
-          const error = "Configuração S3 incompleta";
+          const error = "Configuração S3 do bucket assets incompleta";
           ProductionLogger.log("ERROR", error);
           return {
             success: false,
@@ -80,10 +91,10 @@ export function addS3VideosEventListeners(mainWindow: BrowserWindow) {
         // Criar cliente S3 com timeout otimizado
         const client = new S3Client({
           credentials: {
-            accessKeyId: s3Config.accessKeyId,
-            secretAccessKey: s3Config.secretAccessKey,
+            accessKeyId: ASSETS_BUCKET_CONFIG.accessKeyId,
+            secretAccessKey: ASSETS_BUCKET_CONFIG.secretAccessKey,
           },
-          region: s3Config.region,
+          region: ASSETS_BUCKET_CONFIG.region,
           requestHandler: {
             requestTimeout: 10000, // 10 segundos
             connectionTimeout: 5000, // 5 segundos
@@ -92,8 +103,10 @@ export function addS3VideosEventListeners(mainWindow: BrowserWindow) {
 
         // Listar objetos do bucket com limite reduzido para melhor performance
         const command = new ListObjectsV2Command({
-          Bucket: s3Config.bucketName,
-          Prefix: s3Config.folderPrefix ? `${s3Config.folderPrefix}/` : "",
+          Bucket: ASSETS_BUCKET_CONFIG.bucketName,
+          Prefix: ASSETS_BUCKET_CONFIG.folderPrefix
+            ? `${ASSETS_BUCKET_CONFIG.folderPrefix}/`
+            : "",
           MaxKeys: 50, // Reduzido para evitar timeout
         });
 
@@ -172,28 +185,29 @@ export function addS3VideosEventListeners(mainWindow: BrowserWindow) {
     },
   );
 
-  // Obter URL assinada para um vídeo específico
+  // Obter URL assinada para um vídeo específico (SEMPRE usa configuração fixa do bucket assets)
   ipcMain.handle(
     S3_VIDEOS_GET_URL_CHANNEL,
-    async (
-      event,
-      s3Config: S3Config,
-      videoKey: string,
-    ): Promise<S3UrlResult> => {
+    async (event, videoKey: string): Promise<S3UrlResult> => {
       try {
-        ProductionLogger.log("INFO", "Gerando URL assinada para vídeo", {
-          videoKey,
-          bucketName: s3Config.bucketName,
-        });
+        ProductionLogger.log(
+          "INFO",
+          "Gerando URL assinada para vídeo do bucket assets",
+          {
+            videoKey,
+            bucketName: ASSETS_BUCKET_CONFIG.bucketName,
+          },
+        );
 
         // Validar configuração
         if (
-          !s3Config.accessKeyId ||
-          !s3Config.secretAccessKey ||
-          !s3Config.bucketName ||
+          !ASSETS_BUCKET_CONFIG.accessKeyId ||
+          !ASSETS_BUCKET_CONFIG.secretAccessKey ||
+          !ASSETS_BUCKET_CONFIG.bucketName ||
           !videoKey
         ) {
-          const error = "Configuração S3 ou chave do vídeo incompleta";
+          const error =
+            "Configuração S3 do bucket assets ou chave do vídeo incompleta";
           ProductionLogger.log("ERROR", error);
           return {
             success: false,
@@ -204,10 +218,10 @@ export function addS3VideosEventListeners(mainWindow: BrowserWindow) {
         // Criar cliente S3 com timeout otimizado
         const client = new S3Client({
           credentials: {
-            accessKeyId: s3Config.accessKeyId,
-            secretAccessKey: s3Config.secretAccessKey,
+            accessKeyId: ASSETS_BUCKET_CONFIG.accessKeyId,
+            secretAccessKey: ASSETS_BUCKET_CONFIG.secretAccessKey,
           },
-          region: s3Config.region,
+          region: ASSETS_BUCKET_CONFIG.region,
           requestHandler: {
             requestTimeout: 10000, // 10 segundos
             connectionTimeout: 5000, // 5 segundos
@@ -216,7 +230,7 @@ export function addS3VideosEventListeners(mainWindow: BrowserWindow) {
 
         // Criar comando para obter o objeto
         const command = new GetObjectCommand({
-          Bucket: s3Config.bucketName,
+          Bucket: ASSETS_BUCKET_CONFIG.bucketName,
           Key: videoKey,
         });
 

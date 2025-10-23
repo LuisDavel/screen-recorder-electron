@@ -1,13 +1,12 @@
-import { useState, useCallback, useEffect } from "react";
-import { useS3ConfigStore } from "@/store/store-s3-config";
+import { useState, useCallback } from "react";
 
-interface S3Config {
-  accessKeyId: string;
-  secretAccessKey: string;
-  region: string;
-  bucketName: string;
-  folderPrefix?: string;
-}
+/**
+ * Hook para gerenciar vídeos de introdução/encerramento do bucket AWS fixo.
+ *
+ * IMPORTANTE: Este hook NÃO usa configuração do usuário.
+ * Os vídeos vêm de um bucket AWS fixo (assets) configurado no backend.
+ * A configuração S3 do usuário (store-s3-config) é usada APENAS para upload de gravações.
+ */
 
 interface S3Video {
   key: string;
@@ -35,70 +34,40 @@ export function useS3Videos() {
   const [videos, setVideos] = useState<S3Video[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { config: s3StoreConfig, isValidConfig } = useS3ConfigStore();
 
-  // Obter configuração S3 válida do store
-  const s3Config = isValidConfig()
-    ? {
-        accessKeyId: s3StoreConfig.accessKeyId,
-        secretAccessKey: s3StoreConfig.secretAccessKey,
-        region: s3StoreConfig.region,
-        bucketName: s3StoreConfig.bucketName,
-        folderPrefix: s3StoreConfig.folderPrefix,
-      }
-    : null;
+  // Buscar lista de vídeos do bucket assets fixo
+  const loadVideos = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
-  // Buscar lista de vídeos
-  const loadVideos = useCallback(
-    async (config?: S3Config) => {
-      const configToUse = config || s3Config;
+    try {
+      // NÃO passa configuração - o backend usa configuração fixa do bucket assets
+      const result: S3VideosResult =
+        await window.electronAPI.invoke("s3-videos:list");
 
-      if (!configToUse) {
-        setError("Configuração S3 não encontrada");
-        return;
-      }
-
-      setLoading(true);
-      setError(null);
-
-      try {
-        const result: S3VideosResult = await window.electronAPI.invoke(
-          "s3-videos:list",
-          configToUse,
-        );
-
-        if (result.success) {
-          setVideos(result.videos || []);
-        } else {
-          setError(result.message);
-          setVideos([]);
-        }
-      } catch (err) {
-        const errorMessage =
-          err instanceof Error ? err.message : "Erro desconhecido";
-        setError(errorMessage);
+      if (result.success) {
+        setVideos(result.videos || []);
+      } else {
+        setError(result.message);
         setVideos([]);
-      } finally {
-        setLoading(false);
       }
-    },
-    [s3Config],
-  );
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Erro desconhecido";
+      setError(errorMessage);
+      setVideos([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  // Obter URL assinada para um vídeo
+  // Obter URL assinada para um vídeo do bucket assets fixo
   const getVideoUrl = useCallback(
-    async (videoKey: string, config?: S3Config): Promise<string | null> => {
-      const configToUse = config || s3Config;
-
-      if (!configToUse) {
-        setError("Configuração S3 não encontrada");
-        return null;
-      }
-
+    async (videoKey: string): Promise<string | null> => {
       try {
+        // NÃO passa configuração - o backend usa configuração fixa do bucket assets
         const result: S3UrlResult = await window.electronAPI.invoke(
           "s3-videos:get-url",
-          configToUse,
           videoKey,
         );
 
@@ -115,7 +84,7 @@ export function useS3Videos() {
         return null;
       }
     },
-    [s3Config],
+    [],
   );
 
   // Limpar erro
@@ -127,7 +96,6 @@ export function useS3Videos() {
     videos,
     loading,
     error,
-    s3Config,
     loadVideos,
     getVideoUrl,
     clearError,
