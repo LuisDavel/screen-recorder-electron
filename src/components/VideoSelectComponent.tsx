@@ -20,14 +20,30 @@ export function VideoSelectComponent({
     useS3Videos();
 
   const [urlCache, setUrlCache] = useState<{ [key: string]: string }>({});
-  console.log(urlCache);
 
   // Carregar vídeos quando o componente montar
   useEffect(() => {
+    console.log("🎬 VideoSelectComponent montado", {
+      videosCount: videos.length,
+      loading,
+      error,
+    });
+
     if (videos.length === 0 && !loading && !error) {
+      console.log("📥 Iniciando carregamento de vídeos...");
       loadVideos();
     }
   }, []);
+
+  // Log quando vídeos forem carregados
+  useEffect(() => {
+    console.log("🎬 Vídeos atualizados:", {
+      count: videos.length,
+      videos: videos.map((v) => v.displayName),
+      loading,
+      error,
+    });
+  }, [videos, loading, error]);
 
   // Lidar com mudança de seleção
   const handleVideoChange = useCallback(
@@ -72,6 +88,10 @@ export function VideoSelectComponent({
 
   return (
     <div className={`space-y-3 ${className}`}>
+      <label className="mb-1 block text-sm font-medium text-gray-700">
+        {label}
+      </label>
+
       <div className="relative">
         <select
           value={selectedVideo}
@@ -94,10 +114,17 @@ export function VideoSelectComponent({
         )}
       </div>
 
-      {videos.length === 0 && !loading && (
-        <p className="text-sm text-gray-500 italic">
-          Nenhum vídeo encontrado no bucket S3.
-        </p>
+      {error && (
+        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">
+          <p className="mb-1 font-semibold">❌ Erro ao carregar vídeos:</p>
+          <p className="mb-2">{error}</p>
+          <button
+            onClick={handleReload}
+            className="rounded bg-red-600 px-3 py-1 text-xs text-white transition-colors hover:bg-red-700"
+          >
+            🔄 Tentar novamente
+          </button>
+        </div>
       )}
     </div>
   );

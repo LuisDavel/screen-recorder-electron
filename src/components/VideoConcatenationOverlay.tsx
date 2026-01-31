@@ -83,6 +83,16 @@ interface VideoConcatAPI {
     outputPath?: string;
     introVideoUrl?: string;
     outroVideoUrl?: string;
+    introVideoKey?: string;
+    outroVideoKey?: string;
+    s3Config?: {
+      accessKeyId: string;
+      secretAccessKey: string;
+      region: string;
+      bucketName: string;
+      folderPrefix?: string;
+      isConfigured: boolean;
+    };
   }) => Promise<{
     success: boolean;
     outputPath: string;
@@ -214,10 +224,25 @@ export function VideoConcatenationOverlay({
       }));
 
       // USAR MÉTODO SIMPLES (demuxer) - mais confiável que filter_complex
+      console.log("🔍 Verificando s3Config antes de enviar:", {
+        isConfigured: s3Config.isConfigured,
+        isEnabled: s3Config.isEnabled,
+        bucketName: s3Config.bucketName,
+        region: s3Config.region,
+        folderPrefix: s3Config.folderPrefix,
+        hasAccessKey: !!s3Config.accessKeyId,
+        hasSecretKey: !!s3Config.secretAccessKey,
+        accessKeyLength: s3Config.accessKeyId?.length || 0,
+        secretKeyLength: s3Config.secretAccessKey?.length || 0,
+      });
+
       result = await window.videoConcatAPI.simpleConcatenate({
         recordedVideoPath,
         introVideoUrl: headerConfig.introVideo!.url,
         outroVideoUrl: headerConfig.outroVideo!.url,
+        introVideoKey: headerConfig.introVideo!.key, // Passar chave S3 para regeneração
+        outroVideoKey: headerConfig.outroVideo!.key, // Passar chave S3 para regeneração
+        s3Config: s3Config, // Passar configuração S3 completa
       });
       console.log("🎯 RESULTADO RECEBIDO no overlay:", result);
 
@@ -251,9 +276,62 @@ export function VideoConcatenationOverlay({
               bucketName: s3Config.bucketName,
               folderPrefix: s3Config.folderPrefix,
             },
+            {
+              externalId: headerConfig.externalId,
+              id: headerConfig.id,
+            },
           );
 
           console.log("✅ Upload concluído:", uploadResult);
+
+          // Enviar link do vídeo para API Cardiopic se há dados do paciente
+          if (uploadResult.success && uploadResult.s3Url) {
+            try {
+              const { CardiopicApiHelper } = await import(
+                "@/helpers/cardiopic-api-helper"
+              );
+
+              if (CardiopicApiHelper.hasPatientData()) {
+                console.log(
+                  "📡 Enviando link do vídeo CONCATENADO para API Cardiopic...",
+                );
+                const apiResult = await CardiopicApiHelper.sendVideoLink(
+                  uploadResult.s3Url,
+                );
+
+                if (apiResult.success) {
+                  console.log(
+                    "✅ Link do vídeo enviado com sucesso para API Cardiopic!",
+                  );
+
+                  // Notificar usuário sobre sucesso do envio
+                  if (
+                    typeof window !== "undefined" &&
+                    "Notification" in window
+                  ) {
+                    new Notification("Link enviado para Cardiopic", {
+                      body: "Link do vídeo enviado com sucesso para a API!",
+                      icon: "/icon.png",
+                    });
+                  }
+                } else {
+                  console.error(
+                    "❌ Erro ao enviar link para API Cardiopic:",
+                    apiResult.message,
+                  );
+                }
+              } else {
+                console.log(
+                  "ℹ️ Nenhum dado de paciente disponível - não enviando link para API Cardiopic",
+                );
+              }
+            } catch (apiError) {
+              console.error(
+                "❌ Erro ao enviar link para API Cardiopic:",
+                apiError,
+              );
+            }
+          }
 
           setState((prev) => ({
             ...prev,

@@ -101,17 +101,161 @@ function extractVideoName(url: string): string {
   }
 }
 
-// Função para regenerar URL S3 expirada
+// Interface para configuração S3
+interface S3Config {
+  accessKeyId: string;
+  secretAccessKey: string;
+  region: string;
+  bucketName: string;
+  folderPrefix?: string;
+  isConfigured: boolean;
+  isEnabled?: boolean; // Propriedade opcional do renderer
+}
+
+// Função para gerar URL S3 a partir da chave (RECOMENDADA)
+async function generateS3UrlFromKey(
+  videoKey: string,
+  s3Config: S3Config,
+): Promise<string | null> {
+  try {
+    console.log("=================================================");
+    console.log("🔄 GERANDO URL S3 A PARTIR DA CHAVE");
+    console.log("=================================================");
+    console.log("🔍 Chave do vídeo:", videoKey);
+    console.log("🔍 Tipo da chave:", typeof videoKey);
+    console.log("🔍 Comprimento da chave:", videoKey?.length || 0);
+
+    if (!videoKey || videoKey.trim().length === 0) {
+      console.error("❌ Chave do vídeo não fornecida ou vazia");
+      console.error("❌ Tipo:", typeof videoKey);
+      console.error("❌ Valor:", JSON.stringify(videoKey));
+      console.error(
+        "❌ Esta função requer uma chave S3 válida (ex: 'assets/intro.mp4')",
+      );
+      return null;
+    }
+
+    // Importar módulos necessários
+    console.log("📦 Importando módulos S3...");
+    const { S3Client, GetObjectCommand } = require("@aws-sdk/client-s3");
+    const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
+
+    console.log("📦 Usando configuração S3 fornecida...");
+
+    console.log("🔍 Configuração S3 COMPLETA:", {
+      isConfigured: s3Config.isConfigured,
+      bucketName: s3Config.bucketName,
+      region: s3Config.region,
+      folderPrefix: s3Config.folderPrefix,
+      hasAccessKey: !!s3Config.accessKeyId,
+      accessKeyLength: s3Config.accessKeyId?.length || 0,
+      hasSecretKey: !!s3Config.secretAccessKey,
+      secretKeyLength: s3Config.secretAccessKey?.length || 0,
+    });
+
+    if (!s3Config.isConfigured) {
+      console.error("❌ Configuração S3 não está válida");
+      return null;
+    }
+
+    if (
+      !s3Config.accessKeyId ||
+      !s3Config.secretAccessKey ||
+      !s3Config.bucketName
+    ) {
+      console.error("❌ Credenciais S3 incompletas:", {
+        hasAccessKey: !!s3Config.accessKeyId,
+        hasSecretKey: !!s3Config.secretAccessKey,
+        hasBucket: !!s3Config.bucketName,
+        accessKeyId: s3Config.accessKeyId
+          ? "***" + s3Config.accessKeyId.slice(-4)
+          : "undefined",
+        secretAccessKey: s3Config.secretAccessKey
+          ? "***" + s3Config.secretAccessKey.slice(-4)
+          : "undefined",
+        bucketName: s3Config.bucketName || "undefined",
+        region: s3Config.region || "undefined",
+      });
+      return null;
+    }
+
+    // Criar cliente S3
+    console.log("🔄 Criando cliente S3...");
+    const client = new S3Client({
+      credentials: {
+        accessKeyId: s3Config.accessKeyId,
+        secretAccessKey: s3Config.secretAccessKey,
+      },
+      region: s3Config.region,
+    });
+
+    // Usar a chave diretamente (já está no formato correto: assets/intro.mp4)
+    console.log("🔍 Gerando URL para bucket:", s3Config.bucketName);
+    console.log("🔍 Chave do objeto:", videoKey);
+    console.log("🔍 Região:", s3Config.region);
+
+    const command = new GetObjectCommand({
+      Bucket: s3Config.bucketName,
+      Key: videoKey,
+    });
+
+    console.log("🔄 Gerando URL assinada com getSignedUrl...");
+
+    // Gerar nova URL com validade de 2 horas
+    const newUrl = await getSignedUrl(client, command, { expiresIn: 7200 });
+
+    console.log("=================================================");
+    console.log("✅ URL S3 GERADA COM SUCESSO!");
+    console.log("=================================================");
+    console.log(
+      "🔍 URL (primeiros 150 chars):",
+      newUrl.substring(0, 150) + "...",
+    );
+    console.log("🔍 Tamanho da URL:", newUrl.length, "caracteres");
+    return newUrl;
+  } catch (error) {
+    console.error("=================================================");
+    console.error("❌ ERRO AO GERAR URL S3");
+    console.error("=================================================");
+    console.error("❌ Erro completo:", error);
+
+    if (error instanceof Error) {
+      console.error("❌ Mensagem:", error.message);
+      console.error("❌ Nome:", error.name);
+      console.error("❌ Stack trace:", error.stack);
+    }
+
+    // Tentar extrair mais informações do erro AWS
+    if (typeof error === "object" && error !== null) {
+      const awsError = error as any;
+      if (awsError.$metadata) {
+        console.error("❌ AWS Metadata:", awsError.$metadata);
+      }
+      if (awsError.Code) {
+        console.error("❌ AWS Error Code:", awsError.Code);
+      }
+      if (awsError.message) {
+        console.error("❌ AWS Message:", awsError.message);
+      }
+    }
+
+    console.error("=================================================");
+    return null;
+  }
+}
+
+// Função para regenerar URL S3 expirada (LEGADO - usa extração de chave da URL)
 async function regenerateS3Url(expiredUrl: string): Promise<string | null> {
   try {
-    console.log("🔄 Regenerando URL S3 expirada...", expiredUrl);
+    console.log("🔄 Regenerando URL S3 expirada...");
+    console.log("🔍 URL expirada:", expiredUrl.substring(0, 150) + "...");
 
     // Extrair informações da URL expirada
     const urlObj = new URL(expiredUrl);
     console.log("🔍 URL parsed:", {
       hostname: urlObj.hostname,
       pathname: urlObj.pathname,
-      search: urlObj.search,
+      search: urlObj.search.substring(0, 50) + "...",
     });
 
     const pathParts = urlObj.pathname
@@ -119,19 +263,25 @@ async function regenerateS3Url(expiredUrl: string): Promise<string | null> {
       .filter((part) => part.length > 0);
     console.log("🔍 Path parts:", pathParts);
 
-    // Para URLs S3, a chave pode estar em diferentes posições dependendo do formato
+    // CORREÇÃO: Extrair a chave completa incluindo a pasta
+    // Formato esperado: bucket.s3.region.amazonaws.com/assets/intro.mp4
+    // A chave deve ser: assets/intro.mp4 (não apenas intro.mp4)
     let videoKey = "";
 
-    if (pathParts.length >= 2) {
-      // Formato: bucket.s3.region.amazonaws.com/folder/file.mp4
-      // ou s3.amazonaws.com/bucket/folder/file.mp4
-      if (
-        urlObj.hostname.includes(".s3.") ||
-        urlObj.hostname.startsWith("s3.")
-      ) {
-        videoKey = pathParts.slice(-1)[0]; // Último elemento é o arquivo
-      } else {
-        videoKey = pathParts.slice(-1)[0]; // Último elemento é o arquivo
+    if (pathParts.length >= 1) {
+      // Se tiver bucket no hostname (bucket.s3.region.amazonaws.com/folder/file.mp4)
+      if (urlObj.hostname.includes(".s3.")) {
+        // Toda a pathname é a chave (removendo a primeira barra)
+        videoKey = pathParts.join("/");
+      }
+      // Se tiver bucket no path (s3.amazonaws.com/bucket/folder/file.mp4)
+      else if (urlObj.hostname.startsWith("s3.")) {
+        // Remover o nome do bucket (primeiro elemento) e pegar o resto
+        videoKey = pathParts.slice(1).join("/");
+      }
+      // Outros formatos
+      else {
+        videoKey = pathParts.join("/");
       }
     }
 
@@ -187,27 +337,33 @@ async function regenerateS3Url(expiredUrl: string): Promise<string | null> {
       region: s3Config.region,
     });
 
-    // Construir chave completa
-    const fullKey = s3Config.folderPrefix
-      ? `${s3Config.folderPrefix}/${videoKey}`
-      : videoKey;
-    console.log("🔍 Chave completa do objeto:", fullKey);
+    // A chave já está completa (ex: assets/intro.mp4)
+    // NÃO adicionar folderPrefix novamente
+    console.log("🔍 Chave do objeto S3:", videoKey);
 
     const command = new GetObjectCommand({
       Bucket: s3Config.bucketName,
-      Key: fullKey,
+      Key: videoKey,
     });
 
     console.log("🔄 Gerando URL assinada...");
+    console.log("🔍 Bucket:", s3Config.bucketName);
+    console.log("🔍 Key:", videoKey);
+    console.log("🔍 Region:", s3Config.region);
+
     // Gerar nova URL com validade de 2 horas
     const newUrl = await getSignedUrl(client, command, { expiresIn: 7200 });
+    console.log("✅ Nova URL S3 gerada com sucesso!");
     console.log(
-      "✅ Nova URL S3 gerada com sucesso:",
-      newUrl.substring(0, 100) + "...",
+      "🔍 Nova URL (primeiros 150 chars):",
+      newUrl.substring(0, 150) + "...",
     );
     return newUrl;
   } catch (error) {
     console.error("❌ Erro ao regenerar URL S3:", error);
+    if (error instanceof Error) {
+      console.error("❌ Stack trace:", error.stack);
+    }
     return null;
   }
 }
@@ -234,6 +390,76 @@ async function validateS3Url(url: string): Promise<boolean> {
 export function registerSimpleVideoConcatListeners(mainWindow: BrowserWindow) {
   console.log("🚀 Registrando listeners SIMPLES para video concat...");
 
+  // Handler de TESTE para validar configuração S3
+  ipcMain.handle("video-concat:test-s3-config", async (_event) => {
+    try {
+      console.log("🧪 TESTE DE CONFIGURAÇÃO S3");
+      console.log("=================================================");
+
+      const { useS3ConfigStore } = require("../../../../store/store-s3-config");
+      const s3Config = useS3ConfigStore.getState().config;
+
+      const diagnostics = {
+        isConfigured: s3Config.isConfigured,
+        isEnabled: s3Config.isEnabled,
+        bucketName: s3Config.bucketName,
+        region: s3Config.region,
+        folderPrefix: s3Config.folderPrefix,
+        hasAccessKey: !!s3Config.accessKeyId,
+        accessKeyId: s3Config.accessKeyId
+          ? `${s3Config.accessKeyId.substring(0, 8)}...`
+          : "não definido",
+        accessKeyLength: s3Config.accessKeyId?.length || 0,
+        hasSecretKey: !!s3Config.secretAccessKey,
+        secretKeyLength: s3Config.secretAccessKey?.length || 0,
+      };
+
+      console.log("📊 Diagnóstico S3:", diagnostics);
+      console.log("=================================================");
+
+      return { success: true, diagnostics };
+    } catch (error) {
+      console.error("❌ Erro ao diagnosticar S3:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  });
+
+  // Handler de TESTE para gerar URL a partir de uma chave
+  ipcMain.handle(
+    "video-concat:test-generate-url",
+    async (_event, videoKey: string, s3Config: S3Config) => {
+      try {
+        console.log("🧪 TESTE DE GERAÇÃO DE URL");
+        console.log("=================================================");
+        console.log("🔑 Chave fornecida:", videoKey);
+
+        const url = await generateS3UrlFromKey(videoKey, s3Config);
+
+        if (url) {
+          return {
+            success: true,
+            url: url.substring(0, 150) + "...",
+            urlLength: url.length,
+          };
+        } else {
+          return {
+            success: false,
+            error: "Falha ao gerar URL (retornou null)",
+          };
+        }
+      } catch (error) {
+        console.error("❌ Erro no teste de geração:", error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    },
+  );
+
   // Handler SIMPLES - Método demuxer (file list) confiável
   ipcMain.handle(
     "video-concat:simple-concatenate",
@@ -244,11 +470,52 @@ export function registerSimpleVideoConcatListeners(mainWindow: BrowserWindow) {
         outputPath?: string;
         introVideoUrl?: string;
         outroVideoUrl?: string;
+        introVideoKey?: string; // Nova propriedade para chave S3
+        outroVideoKey?: string; // Nova propriedade para chave S3
+        s3Config?: S3Config; // Configuração S3 do renderer
       },
     ) => {
       return new Promise(async (resolve, reject) => {
-        const { recordedVideoPath, outputPath, introVideoUrl, outroVideoUrl } =
-          options;
+        const {
+          recordedVideoPath,
+          outputPath,
+          introVideoUrl,
+          outroVideoUrl,
+          introVideoKey,
+          outroVideoKey,
+          s3Config,
+        } = options;
+
+        console.log("📦 Opções recebidas no handler:");
+        console.log("  - recordedVideoPath:", recordedVideoPath);
+        console.log(
+          "  - introVideoUrl:",
+          introVideoUrl ? "✅ fornecida" : "❌ não fornecida",
+        );
+        console.log(
+          "  - outroVideoUrl:",
+          outroVideoUrl ? "✅ fornecida" : "❌ não fornecida",
+        );
+        console.log("  - introVideoKey:", introVideoKey || "não fornecida");
+        console.log("  - outroVideoKey:", outroVideoKey || "não fornecida");
+        console.log(
+          "  - s3Config:",
+          s3Config ? "✅ fornecida" : "❌ não fornecida",
+        );
+
+        if (s3Config) {
+          console.log("  - s3Config detalhes:", {
+            isConfigured: s3Config.isConfigured,
+            bucketName: s3Config.bucketName,
+            region: s3Config.region,
+            hasAccessKey: !!s3Config.accessKeyId,
+            hasSecretKey: !!s3Config.secretAccessKey,
+          });
+        }
+
+        // IMPORTANTE: s3Config é OPCIONAL para este método
+        // Só é necessário se precisarmos regenerar URLs expiradas
+        // Como agora usamos as URLs diretamente, não é mais obrigatório
 
         // APENAS URLs S3 - sem vídeos demo
         if (!introVideoUrl || !outroVideoUrl) {
@@ -264,71 +531,77 @@ export function registerSimpleVideoConcatListeners(mainWindow: BrowserWindow) {
         console.log("🎬     CONCATENAÇÃO SIMPLES (DEMUXER)");
         console.log("🎬 ========================================");
         console.log("📹 Vídeo de Introdução:", extractVideoName(introVideoUrl));
+        console.log("🔑 Chave S3 Intro:", introVideoKey || "não fornecida");
         console.log(
           "🎭 Vídeo de Encerramento:",
           extractVideoName(outroVideoUrl),
         );
+        console.log("🔑 Chave S3 Outro:", outroVideoKey || "não fornecida");
         console.log("📁 Vídeo Gravado:", recordedVideoPath);
 
-        // VALIDAÇÃO E REGENERAÇÃO DE URLs S3
-        console.log("🔍 Validando URLs S3...");
-        mainWindow.webContents.send(
-          "video-concat:progress",
-          "🔍 Validando URLs S3...",
-        );
-
+        // Regenerar URLs S3 se temos as chaves e configuração
+        console.log("🔄 Verificando se precisamos regenerar URLs S3...");
         let validIntroUrl = introVideoUrl;
         let validOutroUrl = outroVideoUrl;
 
-        // Validar URL de introdução
-        const introValid = await validateS3Url(introVideoUrl);
-        if (!introValid) {
-          console.log("⚠️ URL de introdução inválida, tentando regenerar...");
-          mainWindow.webContents.send(
-            "video-concat:progress",
-            "⚠️ Regenerando URL de introdução...",
+        // Se temos s3Config E as chaves dos vídeos, regenerar URLs para garantir que não estão expiradas
+        if (
+          s3Config &&
+          s3Config.isConfigured &&
+          introVideoKey &&
+          outroVideoKey
+        ) {
+          console.log(
+            "🔑 Temos chaves S3 e configuração - regenerando URLs...",
           );
-          const newIntroUrl = await regenerateS3Url(introVideoUrl);
-          if (newIntroUrl) {
-            validIntroUrl = newIntroUrl;
-            console.log("✅ URL de introdução regenerada com sucesso");
-          } else {
-            console.log(
-              "⚠️ Falha na regeneração, tentando continuar com URL original...",
+
+          try {
+            const newIntroUrl = await generateS3UrlFromKey(
+              introVideoKey,
+              s3Config,
             );
-            mainWindow.webContents.send(
-              "video-concat:progress",
-              "⚠️ Usando URL original (pode falhar)...",
-            );
-            validIntroUrl = introVideoUrl; // Fallback para URL original
+            if (newIntroUrl) {
+              validIntroUrl = newIntroUrl;
+              console.log("✅ URL de introdução regenerada com sucesso");
+            } else {
+              console.warn(
+                "⚠️ Falha ao regenerar URL de introdução, usando URL original",
+              );
+            }
+          } catch (error) {
+            console.warn("⚠️ Erro ao regenerar URL de introdução:", error);
+            console.log("⚠️ Usando URL original (pode estar expirada)");
           }
+
+          try {
+            const newOutroUrl = await generateS3UrlFromKey(
+              outroVideoKey,
+              s3Config,
+            );
+            if (newOutroUrl) {
+              validOutroUrl = newOutroUrl;
+              console.log("✅ URL de encerramento regenerada com sucesso");
+            } else {
+              console.warn(
+                "⚠️ Falha ao regenerar URL de encerramento, usando URL original",
+              );
+            }
+          } catch (error) {
+            console.warn("⚠️ Erro ao regenerar URL de encerramento:", error);
+            console.log("⚠️ Usando URL original (pode estar expirada)");
+          }
+        } else {
+          console.log(
+            "ℹ️ Sem chaves S3 ou configuração - usando URLs originais",
+          );
+          if (!s3Config) console.log("  - s3Config não fornecida");
+          if (s3Config && !s3Config.isConfigured)
+            console.log("  - s3Config não está configurada");
+          if (!introVideoKey) console.log("  - introVideoKey não fornecida");
+          if (!outroVideoKey) console.log("  - outroVideoKey não fornecida");
         }
 
-        // Validar URL de encerramento
-        const outroValid = await validateS3Url(outroVideoUrl);
-        if (!outroValid) {
-          console.log("⚠️ URL de encerramento inválida, tentando regenerar...");
-          mainWindow.webContents.send(
-            "video-concat:progress",
-            "⚠️ Regenerando URL de encerramento...",
-          );
-          const newOutroUrl = await regenerateS3Url(outroVideoUrl);
-          if (newOutroUrl) {
-            validOutroUrl = newOutroUrl;
-            console.log("✅ URL de encerramento regenerada com sucesso");
-          } else {
-            console.log(
-              "⚠️ Falha na regeneração, tentando continuar com URL original...",
-            );
-            mainWindow.webContents.send(
-              "video-concat:progress",
-              "⚠️ Usando URL original (pode falhar)...",
-            );
-            validOutroUrl = outroVideoUrl; // Fallback para URL original
-          }
-        }
-
-        console.log("✅ URLs S3 validadas e prontas para uso");
+        console.log("✅ URLs prontas para download");
 
         // Obter caminho do FFmpeg dinamicamente
         const ffmpegPath = getFFmpegPath();
@@ -418,34 +691,132 @@ export function registerSimpleVideoConcatListeners(mainWindow: BrowserWindow) {
           });
         };
 
-        // Função para baixar arquivo do S3
+        // Função para baixar arquivo do S3 com retry automático
         const downloadS3File = async (
           url: string,
           destPath: string,
+          videoKey?: string,
+          originalUrl?: string,
+          retryCount: number = 0,
         ): Promise<void> => {
           const https = require("https");
           const fs = require("fs");
+          const MAX_RETRIES = 2;
 
-          return new Promise((resolveDownload, rejectDownload) => {
+          return new Promise(async (resolveDownload, rejectDownload) => {
+            console.log(
+              `📥 Tentativa ${retryCount + 1}/${MAX_RETRIES + 1} de download...`,
+            );
+            console.log(
+              `📥 URL (primeiros 150 chars):`,
+              url.substring(0, 150) + "...",
+            );
+
             const file = fs.createWriteStream(destPath);
 
             https
-              .get(url, (response: any) => {
+              .get(url, async (response: any) => {
                 if (
                   response.statusCode === 302 ||
                   response.statusCode === 301
                 ) {
                   // Seguir redirect
+                  console.log(
+                    "🔄 Seguindo redirect para:",
+                    response.headers.location.substring(0, 150) + "...",
+                  );
                   file.close();
                   fs.unlinkSync(destPath);
-                  return downloadS3File(response.headers.location, destPath)
+                  return downloadS3File(
+                    response.headers.location,
+                    destPath,
+                    videoKey,
+                    originalUrl || url,
+                    retryCount,
+                  )
                     .then(resolveDownload)
                     .catch(rejectDownload);
                 }
 
-                if (response.statusCode !== 200) {
+                // Se receber 403 (Forbidden), tentar regenerar URL
+                if (response.statusCode === 403) {
+                  console.error(
+                    `❌ Erro 403 Forbidden - URL expirada ou sem permissão`,
+                  );
                   file.close();
-                  fs.unlinkSync(destPath);
+                  if (fs.existsSync(destPath)) {
+                    fs.unlinkSync(destPath);
+                  }
+
+                  // Tentar regenerar URL se ainda temos retries
+                  if (retryCount < MAX_RETRIES) {
+                    console.log(
+                      `🔄 Tentando regenerar URL S3 (tentativa ${retryCount + 1}/${MAX_RETRIES})...`,
+                    );
+                    mainWindow.webContents.send(
+                      "video-concat:progress",
+                      `⚠️ URL expirada, regenerando... (tentativa ${retryCount + 1}/${MAX_RETRIES})`,
+                    );
+
+                    let newUrl: string | null = null;
+
+                    // PRIORIDADE 1: Se temos videoKey e s3Config, usar generateS3UrlFromKey
+                    if (videoKey && s3Config && s3Config.isConfigured) {
+                      console.log(
+                        "🔑 Usando chave S3 para regenerar:",
+                        videoKey,
+                      );
+                      try {
+                        newUrl = await generateS3UrlFromKey(videoKey, s3Config);
+                      } catch (error) {
+                        console.error("❌ Erro ao gerar URL com chave:", error);
+                      }
+                    }
+
+                    // FALLBACK: Tentar extrair chave da URL
+                    if (!newUrl) {
+                      console.log("🔄 Tentando extrair chave da URL...");
+                      newUrl = await regenerateS3Url(originalUrl || url);
+                    }
+
+                    if (newUrl) {
+                      console.log(
+                        "✅ URL regenerada, tentando download novamente...",
+                      );
+                      return downloadS3File(
+                        newUrl,
+                        destPath,
+                        videoKey,
+                        originalUrl || url,
+                        retryCount + 1,
+                      )
+                        .then(resolveDownload)
+                        .catch(rejectDownload);
+                    } else {
+                      console.error("❌ Falha ao regenerar URL");
+                      return rejectDownload(
+                        new Error(
+                          `Download falhou: 403 Forbidden (URL expirada e não foi possível regenerar)`,
+                        ),
+                      );
+                    }
+                  } else {
+                    return rejectDownload(
+                      new Error(
+                        `Download falhou: 403 Forbidden (máximo de tentativas atingido)`,
+                      ),
+                    );
+                  }
+                }
+
+                if (response.statusCode !== 200) {
+                  console.error(
+                    `❌ Download falhou com status ${response.statusCode}: ${response.statusMessage}`,
+                  );
+                  file.close();
+                  if (fs.existsSync(destPath)) {
+                    fs.unlinkSync(destPath);
+                  }
                   return rejectDownload(
                     new Error(
                       `Download falhou: ${response.statusCode} ${response.statusMessage}`,
@@ -458,6 +829,10 @@ export function registerSimpleVideoConcatListeners(mainWindow: BrowserWindow) {
                   10,
                 );
                 let downloadedBytes = 0;
+
+                console.log(
+                  `📥 Iniciando download - Tamanho total: ${(totalBytes / 1024 / 1024).toFixed(2)}MB`,
+                );
 
                 response.on("data", (chunk: Buffer) => {
                   downloadedBytes += chunk.length;
@@ -474,15 +849,18 @@ export function registerSimpleVideoConcatListeners(mainWindow: BrowserWindow) {
 
                 file.on("finish", () => {
                   file.close();
+                  console.log(`✅ Download concluído: ${destPath}`);
                   resolveDownload();
                 });
 
                 file.on("error", (err: Error) => {
+                  console.error(`❌ Erro ao escrever arquivo:`, err);
                   fs.unlink(destPath, () => {});
                   rejectDownload(err);
                 });
               })
               .on("error", (err: Error) => {
+                console.error(`❌ Erro na requisição HTTPS:`, err);
                 fs.unlink(destPath, () => {});
                 rejectDownload(err);
               });
@@ -500,7 +878,7 @@ export function registerSimpleVideoConcatListeners(mainWindow: BrowserWindow) {
             "📥 Etapa 0/5: Baixando introdução do S3...",
           );
 
-          await downloadS3File(validIntroUrl, tempIntroS3);
+          await downloadS3File(validIntroUrl, tempIntroS3, introVideoKey);
           console.log("✅ Introdução baixada:", tempIntroS3);
 
           mainWindow.webContents.send(
@@ -508,7 +886,7 @@ export function registerSimpleVideoConcatListeners(mainWindow: BrowserWindow) {
             "📥 Etapa 0/5: Baixando encerramento do S3...",
           );
 
-          await downloadS3File(validOutroUrl, tempOutroS3);
+          await downloadS3File(validOutroUrl, tempOutroS3, outroVideoKey);
           console.log("✅ Encerramento baixado:", tempOutroS3);
 
           // Configurações padrão de normalização para TODOS os vídeos
@@ -516,13 +894,13 @@ export function registerSimpleVideoConcatListeners(mainWindow: BrowserWindow) {
             "-c:v",
             "libx264",
             "-preset",
-            "fast",
+            "medium", // Melhor compressão e qualidade
             "-crf",
-            "23",
+            "18", // Alta qualidade visual
             "-pix_fmt",
             "yuv420p",
             "-vf",
-            "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=30",
+            "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,fps=30",
             "-c:a",
             "aac",
             "-ar",
@@ -530,7 +908,7 @@ export function registerSimpleVideoConcatListeners(mainWindow: BrowserWindow) {
             "-ac",
             "2",
             "-b:a",
-            "128k",
+            "192k", // Melhor qualidade de áudio
             "-movflags",
             "+faststart",
           ];

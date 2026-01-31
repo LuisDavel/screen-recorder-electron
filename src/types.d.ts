@@ -6,209 +6,218 @@ declare const MAIN_WINDOW_VITE_NAME: string;
 
 // Preload types
 interface ThemeModeContext {
-	toggle: () => Promise<boolean>;
-	dark: () => Promise<void>;
-	light: () => Promise<void>;
-	system: () => Promise<boolean>;
-	current: () => Promise<"dark" | "light" | "system">;
+  toggle: () => Promise<boolean>;
+  dark: () => Promise<void>;
+  light: () => Promise<void>;
+  system: () => Promise<boolean>;
+  current: () => Promise<"dark" | "light" | "system">;
 }
 interface ElectronWindow {
-	minimize: () => Promise<void>;
-	maximize: () => Promise<void>;
-	close: () => Promise<void>;
+  minimize: () => Promise<void>;
+  maximize: () => Promise<void>;
+  close: () => Promise<void>;
 }
 
 // Adicionar a interface PlatformContext
 interface PlatformContext {
-	get: () => Promise<PlatformType>;
-	isMacOS: () => Promise<boolean>;
-	isWindows: () => Promise<boolean>;
-	isLinux: () => Promise<boolean>;
+  get: () => Promise<PlatformType>;
+  isMacOS: () => Promise<boolean>;
+  isWindows: () => Promise<boolean>;
+  isLinux: () => Promise<boolean>;
 }
 
 // Adicionar a interface ScreenRecorderContext
 interface ScreenRecorderContext {
-	getSources: () => Promise<ScreenSource[]>;
-	startRecording: (
-		sourceId: string,
-	) => Promise<{ success: boolean; message: string }>;
-	stopRecording: () => Promise<{ success: boolean; message: string }>;
-	saveRecording: (
-		videoBuffer: Buffer,
-		format?: string,
-	) => Promise<{ success: boolean; message: string; filePath?: string }>;
-	getStatus: () => Promise<{ isRecording: boolean; recordedChunks: number }>;
-	getDefaultLocations: () => Promise<DefaultSaveLocations>;
-	chooseSaveLocation: () => Promise<{
-		success: boolean;
-		path?: string;
-		message: string;
-	}>;
-	saveToLocation: (
-		videoBuffer: Buffer,
-		saveLocation: string,
-		format?: string,
-	) => Promise<{
-		success: boolean;
-		message: string;
-		filePath?: string;
-		fileName?: string;
-	}>;
-	sendVideoChunk: (chunk: Buffer) => void;
-	onRecordingStarted: (
-		callback: (event: unknown, data: unknown) => void,
-	) => void;
-	onRecordingStopped: (callback: (event: unknown) => void) => void;
-	removeAllListeners: () => void;
+  getSources: () => Promise<ScreenSource[]>;
+  startRecording: (
+    sourceId: string,
+  ) => Promise<{ success: boolean; message: string }>;
+  stopRecording: () => Promise<{ success: boolean; message: string }>;
+  saveRecording: (
+    videoBuffer: Buffer,
+    format?: string,
+  ) => Promise<{ success: boolean; message: string; filePath?: string }>;
+  getStatus: () => Promise<{ isRecording: boolean; recordedChunks: number }>;
+  getDefaultLocations: () => Promise<DefaultSaveLocations>;
+  chooseSaveLocation: () => Promise<{
+    success: boolean;
+    path?: string;
+    message: string;
+  }>;
+  saveToLocation: (
+    videoBuffer: Buffer,
+    saveLocation: string,
+    format?: string,
+  ) => Promise<{
+    success: boolean;
+    message: string;
+    filePath?: string;
+    fileName?: string;
+  }>;
+  sendVideoChunk: (chunk: Buffer) => void;
+  onRecordingStarted: (
+    callback: (event: unknown, data: unknown) => void,
+  ) => void;
+  onRecordingStopped: (callback: (event: unknown) => void) => void;
+  removeAllListeners: () => void;
 }
 
 // Adicionar a interface PermissionsContext
 interface PermissionsContext {
-	checkPermissions: () => Promise<{
-		camera: boolean;
-		microphone: boolean;
-		screenCapture: boolean;
-	}>;
-	requestPermissions: () => Promise<{
-		camera: boolean;
-		microphone: boolean;
-		screenCapture: boolean;
-	}>;
-	openScreenRecordingPreferences: () => Promise<{
-		success: boolean;
-		error?: string;
-	}>;
+  checkPermissions: () => Promise<{
+    camera: boolean;
+    microphone: boolean;
+    screenCapture: boolean;
+  }>;
+  requestPermissions: () => Promise<{
+    camera: boolean;
+    microphone: boolean;
+    screenCapture: boolean;
+  }>;
+  openScreenRecordingPreferences: () => Promise<{
+    success: boolean;
+    error?: string;
+  }>;
 }
 
 // Adicionar a interface DiagnosticContext
 interface DiagnosticContext {
-	runDiagnostic: () => Promise<{
-		totalIssues: number;
-		criticalIssues: number;
-		warningIssues: number;
-		infoIssues: number;
-		results: Array<{
-			category: "permissions" | "configuration" | "system" | "logs";
-			level: "info" | "warning" | "error";
-			title: string;
-			description: string;
-			solutions: string[];
-			autoFixAvailable: boolean;
-			details?: Record<string, unknown>;
-		}>;
-		systemInfo: {
-			platform: string;
-			appVersion: string;
-			electronVersion: string;
-			webSecurity: boolean;
-			logFileExists: boolean;
-			logFileSize: number;
-			lastLogEntry?: string;
-		};
-	}>;
-	autoFixPermissions: () => Promise<{
-		success: boolean;
-		error?: string;
-	}>;
+  runDiagnostic: () => Promise<{
+    totalIssues: number;
+    criticalIssues: number;
+    warningIssues: number;
+    infoIssues: number;
+    results: Array<{
+      category: "permissions" | "configuration" | "system" | "logs";
+      level: "info" | "warning" | "error";
+      title: string;
+      description: string;
+      solutions: string[];
+      autoFixAvailable: boolean;
+      details?: Record<string, unknown>;
+    }>;
+    systemInfo: {
+      platform: string;
+      appVersion: string;
+      electronVersion: string;
+      webSecurity: boolean;
+      logFileExists: boolean;
+      logFileSize: number;
+      lastLogEntry?: string;
+    };
+  }>;
+  autoFixPermissions: () => Promise<{
+    success: boolean;
+    error?: string;
+  }>;
 }
 
 // Adicionar a interface ProductionLogsContext
 interface ProductionLogsContext {
-	getLogInfo: () => Promise<{
-		logDirectory: string;
-		logFile: string;
-		exists: boolean;
-	}>;
-	openLogDirectory: () => Promise<void>;
-	openLogFile: () => Promise<void>;
-	logMessage: (
-		level: "INFO" | "WARN" | "ERROR",
-		message: string,
-		data?: Record<string, unknown> | string | boolean,
-	) => Promise<void>;
+  getLogInfo: () => Promise<{
+    logDirectory: string;
+    logFile: string;
+    exists: boolean;
+  }>;
+  openLogDirectory: () => Promise<void>;
+  openLogFile: () => Promise<void>;
+  logMessage: (
+    level: "INFO" | "WARN" | "ERROR",
+    message: string,
+    data?: Record<string, unknown> | string | boolean,
+  ) => Promise<void>;
 }
 
 declare interface Window {
-	themeMode: ThemeModeContext;
-	electronWindow: ElectronWindow;
-	platform: PlatformContext;
-	screenRecorder: ScreenRecorderContext;
-	permissions: PermissionsContext;
-	productionLogs: ProductionLogsContext;
-	diagnostic: DiagnosticContext;
-	s3Upload: S3UploadContext;
-	electronAPI: {
-		invoke(channel: string, ...args: any[]): Promise<any>;
-		on(channel: string, callback: (...args: any[]) => void): void;
-		removeAllListeners(channel: string): void;
-	};
+  themeMode: ThemeModeContext;
+  electronWindow: ElectronWindow;
+  platform: PlatformContext;
+  screenRecorder: ScreenRecorderContext;
+  permissions: PermissionsContext;
+  productionLogs: ProductionLogsContext;
+  diagnostic: DiagnosticContext;
+  s3Upload: S3UploadContext;
+  electronAPI: {
+    invoke(channel: string, ...args: any[]): Promise<any>;
+    on(channel: string, callback: (...args: any[]) => void): void;
+    removeAllListeners(channel: string): void;
+  };
 }
 
 // Adicionar o tipo PlatformType
 type PlatformType =
-	| "darwin"
-	| "win32"
-	| "linux"
-	| "freebsd"
-	| "openbsd"
-	| "sunos"
-	| "aix";
+  | "darwin"
+  | "win32"
+  | "linux"
+  | "freebsd"
+  | "openbsd"
+  | "sunos"
+  | "aix";
 
 // Adicionar o tipo ScreenSource
 type ScreenSource = {
-	id: string;
-	name: string;
-	thumbnail: string;
+  id: string;
+  name: string;
+  thumbnail: string;
 };
 
 // Adicionar o tipo DefaultSaveLocations
 type DefaultSaveLocations = {
-	desktop: string;
-	documents: string;
-	videos: string;
-	downloads: string;
+  desktop: string;
+  documents: string;
+  videos: string;
+  downloads: string;
 };
 
 // Adicionar interfaces para S3 Upload
 interface S3Config {
-	accessKeyId: string;
-	secretAccessKey: string;
-	region: string;
-	bucketName: string;
-	folderPrefix?: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  region: string;
+  bucketName: string;
+  folderPrefix?: string;
+}
+
+interface HeaderData {
+  externalId?: string;
+  id?: number;
 }
 
 interface S3UploadResult {
-	success: boolean;
-	message: string;
-	s3Url?: string;
-	uploadId?: string;
-	error?: string;
+  success: boolean;
+  message: string;
+  s3Url?: string;
+  uploadId?: string;
+  error?: string;
 }
 
 interface S3UploadProgress {
-	loaded: number;
-	total: number;
-	percentage: number;
+  loaded: number;
+  total: number;
+  percentage: number;
 }
 
 interface S3UploadContext {
-	uploadFile: (filePath: string, s3Config: S3Config) => Promise<S3UploadResult>;
-	testConnection: (s3Config: S3Config) => Promise<S3UploadResult>;
-	onProgress: (
-		callback: (
-			event: Electron.IpcRendererEvent,
-			progress: S3UploadProgress,
-		) => void,
-	) => void;
-	onComplete: (
-		callback: (
-			event: Electron.IpcRendererEvent,
-			result: S3UploadResult,
-		) => void,
-	) => void;
-	onError: (
-		callback: (event: Electron.IpcRendererEvent, error: string) => void,
-	) => void;
-	removeAllListeners: () => void;
+  uploadFile: (
+    filePath: string,
+    s3Config: S3Config,
+    headerData?: HeaderData,
+  ) => Promise<S3UploadResult>;
+  testConnection: (s3Config: S3Config) => Promise<S3UploadResult>;
+  onProgress: (
+    callback: (
+      event: Electron.IpcRendererEvent,
+      progress: S3UploadProgress,
+    ) => void,
+  ) => void;
+  onComplete: (
+    callback: (
+      event: Electron.IpcRendererEvent,
+      result: S3UploadResult,
+    ) => void,
+  ) => void;
+  onError: (
+    callback: (event: Electron.IpcRendererEvent, error: string) => void,
+  ) => void;
+  removeAllListeners: () => void;
 }

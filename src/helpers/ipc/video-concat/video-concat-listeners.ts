@@ -26,14 +26,15 @@ async function validateS3Url(url: string): Promise<boolean> {
 // Função para regenerar URL S3 expirada
 async function regenerateS3Url(expiredUrl: string): Promise<string | null> {
   try {
-    console.log("🔄 Regenerando URL S3 expirada...", expiredUrl);
+    console.log("🔄 Regenerando URL S3 expirada...");
+    console.log("🔍 URL expirada:", expiredUrl.substring(0, 150) + "...");
 
     // Extrair informações da URL expirada
     const urlObj = new URL(expiredUrl);
     console.log("🔍 URL parsed:", {
       hostname: urlObj.hostname,
       pathname: urlObj.pathname,
-      search: urlObj.search,
+      search: urlObj.search.substring(0, 50) + "...",
     });
 
     const pathParts = urlObj.pathname
@@ -41,19 +42,25 @@ async function regenerateS3Url(expiredUrl: string): Promise<string | null> {
       .filter((part) => part.length > 0);
     console.log("🔍 Path parts:", pathParts);
 
-    // Para URLs S3, a chave pode estar em diferentes posições dependendo do formato
+    // CORREÇÃO: Extrair a chave completa incluindo a pasta
+    // Formato esperado: bucket.s3.region.amazonaws.com/assets/intro.mp4
+    // A chave deve ser: assets/intro.mp4 (não apenas intro.mp4)
     let videoKey = "";
 
-    if (pathParts.length >= 2) {
-      // Formato: bucket.s3.region.amazonaws.com/folder/file.mp4
-      // ou s3.amazonaws.com/bucket/folder/file.mp4
-      if (
-        urlObj.hostname.includes(".s3.") ||
-        urlObj.hostname.startsWith("s3.")
-      ) {
-        videoKey = pathParts.slice(-1)[0]; // Último elemento é o arquivo
-      } else {
-        videoKey = pathParts.slice(-1)[0]; // Último elemento é o arquivo
+    if (pathParts.length >= 1) {
+      // Se tiver bucket no hostname (bucket.s3.region.amazonaws.com/folder/file.mp4)
+      if (urlObj.hostname.includes(".s3.")) {
+        // Toda a pathname é a chave (removendo a primeira barra)
+        videoKey = pathParts.join("/");
+      }
+      // Se tiver bucket no path (s3.amazonaws.com/bucket/folder/file.mp4)
+      else if (urlObj.hostname.startsWith("s3.")) {
+        // Remover o nome do bucket (primeiro elemento) e pegar o resto
+        videoKey = pathParts.slice(1).join("/");
+      }
+      // Outros formatos
+      else {
+        videoKey = pathParts.join("/");
       }
     }
 
@@ -109,27 +116,33 @@ async function regenerateS3Url(expiredUrl: string): Promise<string | null> {
       region: s3Config.region,
     });
 
-    // Construir chave completa
-    const fullKey = s3Config.folderPrefix
-      ? `${s3Config.folderPrefix}/${videoKey}`
-      : videoKey;
-    console.log("🔍 Chave completa do objeto:", fullKey);
+    // A chave já está completa (ex: assets/intro.mp4)
+    // NÃO adicionar folderPrefix novamente
+    console.log("🔍 Chave do objeto S3:", videoKey);
 
     const command = new GetObjectCommand({
       Bucket: s3Config.bucketName,
-      Key: fullKey,
+      Key: videoKey,
     });
 
     console.log("🔄 Gerando URL assinada...");
+    console.log("🔍 Bucket:", s3Config.bucketName);
+    console.log("🔍 Key:", videoKey);
+    console.log("🔍 Region:", s3Config.region);
+
     // Gerar nova URL com validade de 2 horas
     const newUrl = await getSignedUrl(client, command, { expiresIn: 7200 });
+    console.log("✅ Nova URL S3 gerada com sucesso!");
     console.log(
-      "✅ Nova URL S3 gerada com sucesso:",
-      newUrl.substring(0, 100) + "...",
+      "🔍 Nova URL (primeiros 150 chars):",
+      newUrl.substring(0, 150) + "...",
     );
     return newUrl;
   } catch (error) {
     console.error("❌ Erro ao regenerar URL S3:", error);
+    if (error instanceof Error) {
+      console.error("❌ Stack trace:", error.stack);
+    }
     return null;
   }
 }
@@ -511,11 +524,11 @@ export function registerVideoConcatListeners(mainWindow: BrowserWindow) {
                 "-c:a",
                 "aac",
                 "-preset",
-                "veryfast", // Mais rápido, menos CPU
+                "medium", // Melhor compressão e qualidade
                 "-crf",
-                "28", // Qualidade menor para processar mais rápido
+                "18", // Alta qualidade visual
                 "-vf",
-                "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2",
+                "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2",
                 "-af",
                 "aresample=44100",
                 "-r",
@@ -539,11 +552,11 @@ export function registerVideoConcatListeners(mainWindow: BrowserWindow) {
                 "-c:a",
                 "aac",
                 "-preset",
-                "veryfast",
+                "medium",
                 "-crf",
-                "28",
+                "18",
                 "-vf",
-                "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2",
+                "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2",
                 "-af",
                 "aresample=44100",
                 "-r",
@@ -570,11 +583,11 @@ export function registerVideoConcatListeners(mainWindow: BrowserWindow) {
                 "-c:a",
                 "aac",
                 "-preset",
-                "veryfast",
+                "medium",
                 "-crf",
-                "28",
+                "18",
                 "-vf",
-                "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2",
+                "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2",
                 "-af",
                 "aresample=44100",
                 "-r",
@@ -742,9 +755,9 @@ export function registerVideoConcatListeners(mainWindow: BrowserWindow) {
               "-c:a",
               "aac",
               "-preset",
-              "veryfast", // Menos CPU intensivo
+              "medium", // Melhor compressão e qualidade
               "-crf",
-              "28",
+              "18", // Alta qualidade visual
               "-movflags",
               "+faststart",
               "-y",
@@ -772,18 +785,18 @@ export function registerVideoConcatListeners(mainWindow: BrowserWindow) {
                 "-i",
                 validOutroUrl,
                 "-filter_complex",
-                "[0:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2[v0];" +
-                  "[1:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2[v1];" +
-                  "[2:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2[v2];" +
+                "[0:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2[v0];" +
+                  "[1:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2[v1];" +
+                  "[2:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2[v2];" +
                   "[v0][v1][v2]concat=n=3:v=1:a=0[outv]",
                 "-map",
                 "[outv]",
                 "-c:v",
                 "libx264",
                 "-preset",
-                "veryfast",
+                "medium",
                 "-crf",
-                "30", // Qualidade ainda menor
+                "18", // Alta qualidade visual
                 "-an",
                 "-y",
                 finalOutputPath,
@@ -814,17 +827,17 @@ export function registerVideoConcatListeners(mainWindow: BrowserWindow) {
                   "-i",
                   recordedVideoPath,
                   "-filter_complex",
-                  "[0:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2[v0];" +
-                    "[1:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2[v1];" +
+                  "[0:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2[v0];" +
+                    "[1:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2[v1];" +
                     "[v0][v1]concat=n=2:v=1:a=0[outv]",
                   "-map",
                   "[outv]",
                   "-c:v",
                   "libx264",
                   "-preset",
-                  "ultrafast",
+                  "medium",
                   "-crf",
-                  "30",
+                  "18",
                   "-an",
                   "-y",
                   tempStep1,
@@ -848,9 +861,9 @@ export function registerVideoConcatListeners(mainWindow: BrowserWindow) {
                   "-c:v",
                   "libx264",
                   "-preset",
-                  "ultrafast",
+                  "medium",
                   "-crf",
-                  "30",
+                  "18",
                   "-an",
                   "-y",
                   finalOutputPath,

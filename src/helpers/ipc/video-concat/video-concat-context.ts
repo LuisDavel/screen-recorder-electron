@@ -91,6 +91,9 @@ export function exposeVideoConcatContext() {
         outputPath?: string;
         introVideoUrl?: string;
         outroVideoUrl?: string;
+        introVideoKey?: string;
+        outroVideoKey?: string;
+        s3Config?: any;
       }) => ipcRenderer.invoke("video-concat:simple-concatenate", options),
     });
 
